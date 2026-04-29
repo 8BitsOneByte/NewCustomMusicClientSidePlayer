@@ -1,6 +1,7 @@
 package org.exmple.newcustommusicclientsideplayer.client.gui;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -14,8 +15,10 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistRepository;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+@NullMarked
 public final class CRenamePlaylistScreen extends Screen {
     private static final int MAX_PLAYLIST_NAME_LENGTH = 50;
     private static final int INPUT_MAX_LENGTH = 60;
@@ -33,7 +36,9 @@ public final class CRenamePlaylistScreen extends Screen {
     private final Consumer<String> onRename;
     private final Set<String> existingNamesLower = new HashSet<>();
 
+    @Nullable
     private EditBox nameEdit;
+    @Nullable
     private Button renameButton;
 
     public CRenamePlaylistScreen(Screen lastScreen, String originalName, Consumer<String> onRename) {
@@ -47,21 +52,22 @@ public final class CRenamePlaylistScreen extends Screen {
     protected void init() {
         this.loadExistingNames();
 
-        this.nameEdit = new EditBox(this.font, this.width / 2 - INPUT_BOX_WIDTH / 2, 160, INPUT_BOX_WIDTH, 20, NAME_LABEL);
-        this.nameEdit.setMaxLength(INPUT_MAX_LENGTH);
-        this.nameEdit.setHint(NAME_HINT);
-        this.nameEdit.setValue(this.originalName);
-        this.nameEdit.setResponder(name -> this.updateValidationState());
-        this.addRenderableWidget(this.nameEdit);
+        EditBox nameEdit = new EditBox(this.font, this.width / 2 - INPUT_BOX_WIDTH / 2, 160, INPUT_BOX_WIDTH, 20, NAME_LABEL);
+        nameEdit.setMaxLength(INPUT_MAX_LENGTH);
+        nameEdit.setHint(NAME_HINT);
+        nameEdit.setValue(this.originalName);
+        nameEdit.setResponder(ignoredName -> this.updateValidationState());
+        this.nameEdit = nameEdit;
+        this.addRenderableWidget(nameEdit);
 
         this.renameButton = this.addRenderableWidget(
-            Button.builder(Component.translatable("screen.custommusicclientsideplayer.rename_playlist.rename_button"), button -> this.renamePlaylist())
+            Button.builder(Component.translatable("screen.custommusicclientsideplayer.rename_playlist.rename_button"), ignoredButton -> this.renamePlaylist())
                 .bounds(this.width / 2 - 155, this.height - 28, 150, 20)
                 .build()
         );
 
         this.addRenderableWidget(
-            Button.builder(CommonComponents.GUI_CANCEL, button -> this.onClose())
+            Button.builder(CommonComponents.GUI_CANCEL, ignoredButton -> this.onClose())
                 .bounds(this.width / 2 + 5, this.height - 28, 150, 20)
                 .build()
         );
@@ -93,14 +99,16 @@ public final class CRenamePlaylistScreen extends Screen {
     }
 
     private void updateValidationState() {
-        @Nullable Component error = this.validateCurrentName();
-        this.renameButton.active = error == null;
-        this.renameButton.setTooltip(error == null ? null : Tooltip.create(error));
+        Component error = this.validateCurrentName();
+        Button renameButton = Objects.requireNonNull(this.renameButton);
+        renameButton.active = error == null;
+        renameButton.setTooltip(error == null ? null : Tooltip.create(error));
     }
 
     @Nullable
     private Component validateCurrentName() {
-        String candidate = this.nameEdit.getValue().trim();
+        EditBox nameEdit = Objects.requireNonNull(this.nameEdit);
+        String candidate = nameEdit.getValue().trim();
         if (candidate.equals(this.originalName)) {
             return SAME_AS_ORIGINAL_ERROR;
         }
@@ -127,6 +135,6 @@ public final class CRenamePlaylistScreen extends Screen {
             return;
         }
 
-        this.onRename.accept(this.nameEdit.getValue().trim());
+        this.onRename.accept(Objects.requireNonNull(this.nameEdit).getValue().trim());
     }
 }
