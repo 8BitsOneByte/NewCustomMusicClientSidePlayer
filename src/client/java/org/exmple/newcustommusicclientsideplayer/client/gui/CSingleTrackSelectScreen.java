@@ -49,7 +49,6 @@ public final class CSingleTrackSelectScreen extends Screen {
     private int namespaceIndex;
 
     private SoundSelectionList soundSelectionList;
-    private EditBox searchBox;
     private MultiLineTextWidget namespaceWidget;
     private Button playSelectedTrackButton;
     private Button renameTrackButton;
@@ -66,10 +65,10 @@ public final class CSingleTrackSelectScreen extends Screen {
         header.defaultCellSetting().alignHorizontallyCenter();
         header.addChild(new StringWidget(this.title, this.font));
         this.namespaceWidget = header.addChild(new MultiLineTextWidget(this.namespaceComponent(), this.font).setCentered(true).setMaxWidth((int)(this.width * 0.8F)));
-        this.searchBox = header.addChild(new EditBox(this.font, 0, 0, LIST_WIDTH, 15, Component.empty()));
-        this.searchBox.setHint(SEARCH_HINT);
-        this.searchBox.setValue(this.filter);
-        this.searchBox.setResponder(value -> {
+        EditBox searchBox = header.addChild(new EditBox(this.font, 0, 0, LIST_WIDTH, 15, Component.empty()));
+        searchBox.setHint(SEARCH_HINT);
+        searchBox.setValue(this.filter);
+        searchBox.setResponder(value -> {
             this.filter = value;
             this.refreshVisibleEntries();
         });
@@ -80,10 +79,10 @@ public final class CSingleTrackSelectScreen extends Screen {
         footer.defaultCellSetting().alignHorizontallyCenter();
         footer.rowSpacing(4);
         GridLayout.RowHelper rowHelper = footer.createRowHelper(2);
-        rowHelper.addChild(Button.builder(NEXT_NAMESPACE_TEXT, button -> this.nextNamespace()).width(FOOTER_BUTTON_WIDTH).build());
-        this.playSelectedTrackButton = rowHelper.addChild(Button.builder(PLAY_SELECTED_TEXT, button -> this.onPlaySelectedTrack()).width(FOOTER_BUTTON_WIDTH).build());
-        this.renameTrackButton = rowHelper.addChild(Button.builder(RENAME_TRACK_TEXT, button -> this.onRenameSelectedTrack()).width(FOOTER_BUTTON_WIDTH).build());
-        rowHelper.addChild(Button.builder(CommonComponents.GUI_BACK, button -> this.onClose()).width(FOOTER_BUTTON_WIDTH).build());
+        rowHelper.addChild(Button.builder(NEXT_NAMESPACE_TEXT, ignoredButton -> this.nextNamespace()).width(FOOTER_BUTTON_WIDTH).build());
+        this.playSelectedTrackButton = rowHelper.addChild(Button.builder(PLAY_SELECTED_TEXT, ignoredButton -> this.onPlaySelectedTrack()).width(FOOTER_BUTTON_WIDTH).build());
+        this.renameTrackButton = rowHelper.addChild(Button.builder(RENAME_TRACK_TEXT, ignoredButton -> this.onRenameSelectedTrack()).width(FOOTER_BUTTON_WIDTH).build());
+        rowHelper.addChild(Button.builder(CommonComponents.GUI_BACK, ignoredButton -> this.onClose()).width(FOOTER_BUTTON_WIDTH).build());
 
         this.layout.visitWidgets(this::addRenderableWidget);
         if (this.soundSelectionList != null) {
@@ -93,7 +92,7 @@ public final class CSingleTrackSelectScreen extends Screen {
         this.layout.arrangeElements();
         this.reloadSounds();
         this.updateButtonStates();
-        this.setInitialFocus(this.searchBox);
+        this.setInitialFocus(searchBox);
     }
 
     @Override
@@ -111,12 +110,13 @@ public final class CSingleTrackSelectScreen extends Screen {
     }
 
     @Override
+    @SuppressWarnings("all")
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     private void reloadSounds() {
-        if (this.minecraft == null) {
+        if (this.minecraft.player == null) {
             return;
         }
 
@@ -159,7 +159,7 @@ public final class CSingleTrackSelectScreen extends Screen {
         List<Identifier> visible = this.allSounds.stream()
             .filter(id -> id.getNamespace().equals(namespace))
             .filter(id -> currentFilter.isBlank()
-                || id.toString().toLowerCase(Locale.ROOT).contains(currentFilter)
+                || id.getPath().toLowerCase(Locale.ROOT).contains(currentFilter)
                 || CTrackNameRepository.getDisplayName(id).toLowerCase(Locale.ROOT).contains(currentFilter))
             .toList();
         this.soundSelectionList.setEntries(visible);
@@ -214,23 +214,21 @@ public final class CSingleTrackSelectScreen extends Screen {
 
     private void onPlaySelectedTrack() {
         Identifier selected = this.getSelectedSound();
-        if (selected == null || this.minecraft == null || this.minecraft.player == null) {
+        if (selected == null || this.minecraft.level == null || this.minecraft.player == null) {
             return;
         }
 
         this.minecraft.setScreen(
             new CSingleTrackPlayConfirmScreen(this, selected, loop -> {
-                if (this.minecraft != null) {
-                    this.minecraft.setScreen(null);
-                    CPlaySoundController.playFromUi(this.minecraft, selected, loop);
-                }
+                this.minecraft.setScreen(null);
+                CPlaySoundController.playFromUi(this.minecraft, selected, loop);
             })
         );
     }
 
     private void onRenameSelectedTrack() {
         Identifier selected = this.getSelectedSound();
-        if (selected == null || this.minecraft == null) {
+        if (selected == null || this.minecraft.player==null ||this.minecraft.level == null) {
             return;
         }
 
@@ -241,9 +239,7 @@ public final class CSingleTrackSelectScreen extends Screen {
     }
 
     private void playUiClickSound() {
-        if (this.minecraft != null) {
-            this.minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
-        }
+        this.minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
     }
 
     static String getDisplayName(Identifier id) {
@@ -251,7 +247,7 @@ public final class CSingleTrackSelectScreen extends Screen {
     }
 
     private final class SoundSelectionList extends ObjectSelectionList<SoundSelectionList.Entry> {
-        private SoundSelectionList(Minecraft minecraft, CSingleTrackSelectScreen screen, int width, int height) {
+        private SoundSelectionList(Minecraft minecraft, CSingleTrackSelectScreen ignoredScreen, int width, int height) {
             super(minecraft, width, height, 0, 36);
             this.centerListVertically = false;
         }
@@ -292,7 +288,7 @@ public final class CSingleTrackSelectScreen extends Screen {
             CSingleTrackSelectScreen.this.updateButtonStates();
         }
 
-        private abstract class Entry extends ObjectSelectionList.Entry<Entry> {
+        private static abstract class Entry extends ObjectSelectionList.Entry<Entry> {
         }
 
         private final class EmptyEntry extends Entry {
@@ -302,6 +298,7 @@ public final class CSingleTrackSelectScreen extends Screen {
             }
 
             @Override
+            @SuppressWarnings("all")//掩耳盗铃？LOL
             public Component getNarration() {
                 return Component.translatable("screen.custommusicclientsideplayer.playlist_editor.empty");
             }
@@ -335,11 +332,13 @@ public final class CSingleTrackSelectScreen extends Screen {
             }
 
             @Override
+            @SuppressWarnings("all")
             public Component getNarration() {
                 return Component.literal(this.id.toString());
             }
 
             @Override
+            @SuppressWarnings("all")
             public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
                 CSingleTrackSelectScreen.this.playUiClickSound();
                 this.list.setSelected(this);

@@ -1,6 +1,7 @@
 package org.exmple.newcustommusicclientsideplayer.client.gui;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -14,7 +15,11 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
+
+@NullMarked
 public final class CRenameTrackScreen extends Screen {
     private static final int INPUT_BOX_WIDTH = 260;
     private static final Component TITLE = Component.translatable("screen.custommusicclientsideplayer.rename_track.title");
@@ -30,7 +35,10 @@ public final class CRenameTrackScreen extends Screen {
     private final Runnable onRenamed;
     private final Set<String> existingNamesLower = new HashSet<>();
 
+    @Nullable
     private EditBox nameEdit;
+
+    @Nullable
     private Button renameButton;
 
     public CRenameTrackScreen(Screen lastScreen, Identifier selectedTrack, List<Identifier> sameNamespaceTracks, Runnable onRenamed) {
@@ -50,20 +58,21 @@ public final class CRenameTrackScreen extends Screen {
 
     @Override
     protected void init() {
-        this.nameEdit = new EditBox(this.font, this.width / 2 - INPUT_BOX_WIDTH / 2, 160, INPUT_BOX_WIDTH, 20, NAME_LABEL);
-        this.nameEdit.setMaxLength(CTrackNameRepository.INPUT_MAX_LENGTH);
-        this.nameEdit.setHint(NAME_HINT);
-        this.nameEdit.setResponder(value -> this.updateValidationState());
-        this.addRenderableWidget(this.nameEdit);
+        EditBox nameEdit = new EditBox(this.font, this.width / 2 - INPUT_BOX_WIDTH / 2, 160, INPUT_BOX_WIDTH, 20, NAME_LABEL);
+        nameEdit.setMaxLength(CTrackNameRepository.INPUT_MAX_LENGTH);
+        nameEdit.setHint(NAME_HINT);
+        nameEdit.setResponder(ignoredValue -> this.updateValidationState());
+        this.nameEdit = nameEdit;
+        this.addRenderableWidget(nameEdit);
 
         this.renameButton = this.addRenderableWidget(
-            Button.builder(RENAME_BUTTON_TEXT, button -> this.renameTrack())
+            Button.builder(RENAME_BUTTON_TEXT, ignoredButton -> this.renameTrack())
                 .bounds(this.width / 2 - 155, this.height - 28, 150, 20)
                 .build()
         );
 
         this.addRenderableWidget(
-            Button.builder(CommonComponents.GUI_CANCEL, button -> this.onClose())
+            Button.builder(CommonComponents.GUI_CANCEL, ignoredButton -> this.onClose())
                 .bounds(this.width / 2 + 5, this.height - 28, 150, 20)
                 .build()
         );
@@ -85,12 +94,15 @@ public final class CRenameTrackScreen extends Screen {
 
     private void updateValidationState() {
         Component error = this.validateCurrentName();
-        this.renameButton.active = error == null;
-        this.renameButton.setTooltip(error == null ? null : Tooltip.create(error));
+        Button renameButton = Objects.requireNonNull(this.renameButton);
+        renameButton.active = error == null;
+        renameButton.setTooltip(error == null ? null : Tooltip.create(error));
     }
 
+    @Nullable
     private Component validateCurrentName() {
-        String candidate = this.nameEdit.getValue().trim();
+        EditBox nameEdit = Objects.requireNonNull(this.nameEdit);
+        String candidate = nameEdit.getValue().trim();
         if (candidate.isEmpty()) {
             return EMPTY_NAME_ERROR;
         }
@@ -114,7 +126,7 @@ public final class CRenameTrackScreen extends Screen {
         }
 
         try {
-            CTrackNameRepository.renameTrack(this.selectedTrack, this.nameEdit.getValue());
+            CTrackNameRepository.renameTrack(this.selectedTrack, Objects.requireNonNull(this.nameEdit).getValue());
             this.onRenamed.run();
         } catch (IOException exception) {
             if (this.minecraft.player != null) {

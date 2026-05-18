@@ -37,9 +37,9 @@ public final class CSingleTrackPlayConfirmScreen extends Screen {
 
         LinearLayout buttonRow = this.layout.addChild(LinearLayout.horizontal().spacing(4));
         buttonRow.defaultCellSetting().paddingTop(16);
-        buttonRow.addChild(Button.builder(Component.translatable("screen.custommusicclientsideplayer.play_confirm.loop"), button -> this.onConfirm.accept(true)).width(BUTTON_WIDTH).build());
-        buttonRow.addChild(Button.builder(Component.translatable("screen.custommusicclientsideplayer.play_confirm.dont_loop"), button -> this.onConfirm.accept(false)).width(BUTTON_WIDTH).build());
-        buttonRow.addChild(Button.builder(Component.translatable("screen.custommusicclientsideplayer.play_confirm.cancel"), button -> this.onClose()).width(BUTTON_WIDTH).build());
+        buttonRow.addChild(Button.builder(Component.translatable("screen.custommusicclientsideplayer.play_confirm.loop"), ignoredButton -> this.onConfirm.accept(true)).width(BUTTON_WIDTH).build());
+        buttonRow.addChild(Button.builder(Component.translatable("screen.custommusicclientsideplayer.play_confirm.dont_loop"), ignoredButton -> this.onConfirm.accept(false)).width(BUTTON_WIDTH).build());
+        buttonRow.addChild(Button.builder(Component.translatable("screen.custommusicclientsideplayer.play_confirm.cancel"), ignoredButton -> this.onClose()).width(BUTTON_WIDTH).build());
 
         this.layout.visitWidgets(this::addRenderableWidget);
         this.repositionElements();

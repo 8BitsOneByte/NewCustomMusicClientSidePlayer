@@ -11,6 +11,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundSource;
+import org.exmple.newcustommusicclientsideplayer.client.customnowplayingtoast.CCustomNowPlayingToast;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaybackVolumeSettings;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
 
@@ -533,7 +534,15 @@ public final class CPlaySoundController {
         startupGraceTicks = STARTUP_GRACE_TICKS;
         currentSoundObservedActive = false;
         soundManager.play(currentSound);
+        showCustomNowPlayingToast(client, soundId);
         return true;
+    }
+
+    private static void showCustomNowPlayingToast(Minecraft client, Identifier soundId) {
+        CCustomNowPlayingToast.show(
+            client,
+            Component.literal(soundId.getNamespace() + "-" + getDisplayName(soundId))
+        );
     }
 
     private static List<Identifier> filterPlayableSounds(Minecraft client, List<Identifier> sounds) {

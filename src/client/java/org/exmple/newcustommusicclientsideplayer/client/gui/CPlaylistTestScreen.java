@@ -266,7 +266,7 @@ public class CPlaylistTestScreen extends Screen {
             .filter(id -> !this.playlist.contains(id))
             .filter(id -> id.getNamespace().equals(namespace))
             .filter(id -> filter.isBlank()
-                || id.toString().toLowerCase(Locale.ROOT).contains(filter)
+                || id.getPath().toLowerCase(Locale.ROOT).contains(filter)
                 || CTrackNameRepository.getDisplayName(id).toLowerCase(Locale.ROOT).contains(filter))
             .toList();
         this.availableSoundList.setIdentifiers(available);

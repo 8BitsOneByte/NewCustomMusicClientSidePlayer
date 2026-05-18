@@ -8,12 +8,14 @@ import net.minecraft.network.chat.Component;
 import org.exmple.newcustommusicclientsideplayer.client.gui.CPlaylistTestScreen;
 //Legacy class only used for test purpose.
 //It will never be used again, how sad.
+@Deprecated
 public final class CPlaylistGuiCommand {
     private CPlaylistGuiCommand() {
     }
 
+    @SuppressWarnings("all")
     public static void register() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> dispatcher.register(
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, ignoredContext) -> dispatcher.register(
                 ClientCommands.literal("cplaylistgui")
                         .executes(commandContext -> openGui(commandContext.getSource()))
         ));
