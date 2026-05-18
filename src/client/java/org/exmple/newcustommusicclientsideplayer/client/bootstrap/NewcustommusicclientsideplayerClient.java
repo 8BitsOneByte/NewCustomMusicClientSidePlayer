@@ -30,7 +30,7 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
     private static boolean previousTrackKeyHeld;
     private static boolean nextTrackKeyHeld;
     private static final KeyMapping.Category CUSTOM_KEY_CATEGORY = KeyMapping.Category.register(
-            Identifier.fromNamespaceAndPath(MOD_ID, "custom_music_client_side_player")
+            Identifier.fromNamespaceAndPath(MOD_ID, "newcustom_music_client_side_player")
     );
     private static final KeyMapping OPEN_PLAYLIST_CONFIG_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.open_playlist_config",
