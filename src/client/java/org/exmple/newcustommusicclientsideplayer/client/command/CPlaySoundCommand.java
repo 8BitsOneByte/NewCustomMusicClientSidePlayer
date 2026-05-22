@@ -1,6 +1,7 @@
 package org.exmple.newcustommusicclientsideplayer.client.command;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
@@ -36,6 +37,17 @@ public final class CPlaySoundCommand {
                                             .suggests(CPlaySoundCommand::suggestSoundTokens)
                                             .executes(commandContext -> executePlay(commandContext.getSource(), StringArgumentType.getString(commandContext, "sound"), false))
                                             .then(
+                                                    ClientCommands.argument("pitch", FloatArgumentType.floatArg(0.0F))
+                                                            .executes(
+                                                                    commandContext -> executePlay(
+                                                                            commandContext.getSource(),
+                                                                            StringArgumentType.getString(commandContext, "sound"),
+                                                                            false,
+                                                                            FloatArgumentType.getFloat(commandContext, "pitch")
+                                                                    )
+                                                            )
+                                            )
+                                            .then(
                                                     ClientCommands.argument("loop", BoolArgumentType.bool())
                                                             .executes(
                                                                     commandContext -> executePlay(
@@ -43,6 +55,17 @@ public final class CPlaySoundCommand {
                                                                             StringArgumentType.getString(commandContext, "sound"),
                                                                             BoolArgumentType.getBool(commandContext, "loop")
                                                                     )
+                                                            )
+                                                            .then(
+                                                                    ClientCommands.argument("pitch", FloatArgumentType.floatArg(0.0F))
+                                                                            .executes(
+                                                                                    commandContext -> executePlay(
+                                                                                            commandContext.getSource(),
+                                                                                            StringArgumentType.getString(commandContext, "sound"),
+                                                                                            BoolArgumentType.getBool(commandContext, "loop"),
+                                                                                            FloatArgumentType.getFloat(commandContext, "pitch")
+                                                                                    )
+                                                                            )
                                                             )
                                             )
                             )
@@ -53,6 +76,10 @@ public final class CPlaySoundCommand {
     }
 
     private static int executePlay(FabricClientCommandSource source, String rawSoundToken, boolean loop) {
+        return executePlay(source, rawSoundToken, loop, CPlaySoundController.DEFAULT_PITCH);
+    }
+
+    private static int executePlay(FabricClientCommandSource source, String rawSoundToken, boolean loop, float pitch) {
         Identifier soundId = resolveSoundId(rawSoundToken);
 
         if (soundId == null) {
@@ -60,9 +87,9 @@ public final class CPlaySoundCommand {
             return 0;
         }
 
-        int result = CPlaySoundController.play(source, soundId, loop);
+        int result = CPlaySoundController.play(source, soundId, loop, pitch);
         if (result > 0) {
-            source.getPlayer().sendSystemMessage(CPlaySoundController.buildSingleTrackMessage(soundId, loop));
+            source.getPlayer().sendSystemMessage(CPlaySoundController.buildSingleTrackMessage(soundId, loop, pitch));
         }
 
         return result;

@@ -17,6 +17,10 @@ import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameReposi
 
 public final class CPlaySoundController {
     private static final int STARTUP_GRACE_TICKS = 20;
+    public static final float DEFAULT_PITCH = 1.0F;
+    public static final float DISPLAY_PITCH_MIN = 0.5F;
+    public static final float DISPLAY_PITCH_MAX = 2.0F;
+
     public enum SessionMode {
         NONE,
         SINGLE_TRACK,
@@ -105,6 +109,19 @@ public final class CPlaySoundController {
         return playbackVolumePercent;
     }
 
+    public static float clampPitchForDisplay(float pitch) {
+        return Math.max(DISPLAY_PITCH_MIN, Math.min(DISPLAY_PITCH_MAX, pitch));
+    }
+
+    public static String formatPitch(float pitch) {
+        float clampedPitch = clampPitchForDisplay(pitch);
+        if (clampedPitch == (long) clampedPitch) {
+            return Long.toString((long) clampedPitch);
+        }
+
+        return Float.toString(clampedPitch);
+    }
+
     public static void loadPlaybackVolumePercent(int playbackVolumePercent) {
         CPlaySoundController.playbackVolumePercent = Math.max(0, Math.min(100, playbackVolumePercent));
     }
@@ -129,7 +146,7 @@ public final class CPlaySoundController {
         int targetIndex = Math.floorMod(rawTargetIndex, total);
         Identifier soundId = playlistQueue.get(targetIndex);
         whiteListedSoundId = soundId;
-        if (!startSound(client, soundId, false)) {
+        if (!startSound(client, soundId, false, DEFAULT_PITCH)) {
             return SkipResult.TARGET_NOT_PLAYABLE;
         }
 
@@ -144,6 +161,10 @@ public final class CPlaySoundController {
     }
 
     public static int play(FabricClientCommandSource source, Identifier soundId, boolean loop) {
+        return play(source, soundId, loop, DEFAULT_PITCH);
+    }
+
+    public static int play(FabricClientCommandSource source, Identifier soundId, boolean loop, float pitch) {
         Minecraft client = source.getClient();
         if (client.level == null) {
             source.sendError(Component.translatable("message.custommusicclientsideplayer.no_client_world"));
@@ -153,7 +174,7 @@ public final class CPlaySoundController {
         clearPlaylistSession();
         forceStopTrackedSound(client);
         whiteListedSoundId = soundId;
-        if (!startSound(client, soundId, loop)) {
+        if (!startSound(client, soundId, loop, pitch)) {
             source.sendError(Component.translatable("message.custommusicclientsideplayer.unknown_sound_id", soundId.toString()));
             return 0;
         }
@@ -164,6 +185,10 @@ public final class CPlaySoundController {
     }
 
     public static int playFromUi(Minecraft client, Identifier soundId, boolean loop) {
+        return playFromUi(client, soundId, loop, DEFAULT_PITCH);
+    }
+
+    public static int playFromUi(Minecraft client, Identifier soundId, boolean loop, float pitch) {
         if (client.level == null) {
             if (client.player != null) {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.no_client_world"));
@@ -175,7 +200,7 @@ public final class CPlaySoundController {
         clearPlaylistSession();
         forceStopTrackedSound(client);
         whiteListedSoundId = soundId;
-        if (!startSound(client, soundId, loop)) {
+        if (!startSound(client, soundId, loop, pitch)) {
             if (client.player != null) {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.unknown_sound_id", soundId.toString()));
             }
@@ -185,7 +210,7 @@ public final class CPlaySoundController {
 
         lastSessionMode = SessionMode.SINGLE_TRACK;
         if (client.player != null) {
-            client.player.sendSystemMessage(buildSingleTrackMessage(soundId, loop));
+            client.player.sendSystemMessage(buildSingleTrackMessage(soundId, loop, pitch));
         }
 
         return 1;
@@ -432,7 +457,7 @@ public final class CPlaySoundController {
             int currentIndex = playlistNextIndex;
             Identifier soundId = playlistQueue.get(playlistNextIndex++);
             whiteListedSoundId = soundId;
-            if (startSound(client, soundId, false)) {
+            if (startSound(client, soundId, false, DEFAULT_PITCH)) {
                 int displayIndex = playlistDisplayIndices.size() > currentIndex ? playlistDisplayIndices.get(currentIndex) : (currentIndex + 1);
                 announceNowPlaying(client, soundId, displayIndex, playlistTotalTracks > 0 ? playlistTotalTracks : total);
                 return true;
@@ -484,6 +509,10 @@ public final class CPlaySoundController {
     }
 
     public static MutableComponent buildSingleTrackMessage(Identifier soundId, boolean loop) {
+        return buildSingleTrackMessage(soundId, loop, DEFAULT_PITCH);
+    }
+
+    public static MutableComponent buildSingleTrackMessage(Identifier soundId, boolean loop, float pitch) {
         String namespace = soundId.getNamespace();
         String songName = getDisplayName(soundId);
 
@@ -495,14 +524,16 @@ public final class CPlaySoundController {
             .append(Component.literal(":"))
             .append(Component.literal(songName).withStyle(ChatFormatting.YELLOW))
             .append(Component.literal(", loop="))
-            .append(Component.literal(loop ? "true" : "false").withStyle(loop ? ChatFormatting.GREEN : ChatFormatting.RED));
+            .append(Component.literal(loop ? "true" : "false").withStyle(loop ? ChatFormatting.GREEN : ChatFormatting.RED))
+            .append(Component.literal(", pitch=").withStyle(ChatFormatting.WHITE))
+            .append(Component.literal(formatPitch(pitch)).withStyle(ChatFormatting.GREEN));
     }
 
     private static String getDisplayName(Identifier id) {
         return CTrackNameRepository.getDisplayName(id);
     }
 
-    private static boolean startSound(Minecraft client, Identifier soundId, boolean loop) {
+    private static boolean startSound(Minecraft client, Identifier soundId, boolean loop, float pitch) {
         SoundManager soundManager = client.getSoundManager();
         if (whiteListedSoundId != null && !soundId.equals(whiteListedSoundId)) {
             return false;
@@ -519,7 +550,7 @@ public final class CPlaySoundController {
             soundId,
             SoundSource.MASTER,
             playbackVolumePercent / 100.0F,
-            1.0F,
+            pitch,
             SoundInstance.createUnseededRandom(),
             loop,
             0,

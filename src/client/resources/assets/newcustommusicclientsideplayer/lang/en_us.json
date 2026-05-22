@@ -105,6 +105,10 @@
   "screen.custommusicclientsideplayer.singletrack.namespace": "(Namespace: %s)",
   "screen.custommusicclientsideplayer.singletrack.play_selected": "Play Selected Track",
   "screen.custommusicclientsideplayer.singletrack.play_selected_todo": "Single-track playback is not implemented yet.",
+  "screen.newcustommusicclientsideplayer.singletrack.pitch_label": "Enter Pitch (1 if omitted)",
+  "screen.newcustommusicclientsideplayer.singletrack.pitch_hint": "Type pitch...",
+  "screen.newcustommusicclientsideplayer.singletrack.pitch_invalid": "Pitch must be a number!",
+  "screen.newcustommusicclientsideplayer.singletrack.pitch_negative": "Pitch cannot be negative!",
 
   "screen.custommusicclientsideplayer.play_confirm.message": "Do you want to play %s with loop enabled?",
   "screen.custommusicclientsideplayer.play_confirm.loop": "Loop",

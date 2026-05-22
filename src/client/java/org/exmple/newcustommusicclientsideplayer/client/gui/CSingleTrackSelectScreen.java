@@ -219,9 +219,9 @@ public final class CSingleTrackSelectScreen extends Screen {
         }
 
         this.minecraft.setScreen(
-            new CSingleTrackPlayConfirmScreen(this, selected, loop -> {
+            new CSingleTrackPlayConfirmScreen(this, selected, (loop, pitch) -> {
                 this.minecraft.setScreen(null);
-                CPlaySoundController.playFromUi(this.minecraft, selected, loop);
+                CPlaySoundController.playFromUi(this.minecraft, selected, loop, pitch);
             })
         );
     }

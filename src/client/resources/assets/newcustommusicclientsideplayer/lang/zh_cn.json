@@ -105,6 +105,10 @@
   "screen.custommusicclientsideplayer.singletrack.namespace": "(命名空间: %s)",
   "screen.custommusicclientsideplayer.singletrack.play_selected": "播放选中的曲目",
   "screen.custommusicclientsideplayer.singletrack.play_selected_todo": "单曲播放逻辑尚未实现。",
+  "screen.newcustommusicclientsideplayer.singletrack.pitch_label": "输入音高（若未指定则默认为1）",
+  "screen.newcustommusicclientsideplayer.singletrack.pitch_hint": "输入音高...",
+  "screen.newcustommusicclientsideplayer.singletrack.pitch_invalid": "音高必须是一个数字！",
+  "screen.newcustommusicclientsideplayer.singletrack.pitch_negative": "音高不能是负数！",
 
   "screen.custommusicclientsideplayer.play_confirm.message": "您想在循环模式开启的情况下播放列表 %s 吗?",
   "screen.custommusicclientsideplayer.play_confirm.loop": "循环",
