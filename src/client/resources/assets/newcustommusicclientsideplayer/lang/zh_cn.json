@@ -37,6 +37,7 @@
   "command.custommusicclientsideplayer.playlist.deleted": "删除了播放列表: %s",
   "command.custommusicclientsideplayer.playlist.not_found": "未找到播放列表: %s",
   "command.custommusicclientsideplayer.playlist.start_index_out_of_range": "起始序号 %s 超出范围，允许范围: 1-%s.",
+  "command.newcustommusicclientsideplayer.playlist.shuffle_requires_loop": "您需要打开循环模式才能使用随机播放。",
   "command.custommusicclientsideplayer.cplaylistgui.opened": "打开了cplaylist测试界面.",
 
   "screen.custommusicclientsideplayer.search": "搜索...",
@@ -100,6 +101,9 @@
   "screen.custommusicclientsideplayer.play_instance.start_playing": "开始播放",
   "screen.custommusicclientsideplayer.play_instance.start_index_invalid": "起始序号必须是正整数！",
   "screen.custommusicclientsideplayer.play_instance.start_index_too_large": "起始序号不能超过 %s！",
+  "screen.newcustommusicclientsideplayer.play_instance.shuffle_on": "随机播放：开",
+  "screen.newcustommusicclientsideplayer.play_instance.shuffle_off": "随机播放：关",
+  "screen.newcustommusicclientsideplayer.play_instance.shuffle_requires_loop": "您需要打开循环模式才能使用随机播放。",
 
   "screen.custommusicclientsideplayer.singletrack.title": "选择要播放的曲目",
   "screen.custommusicclientsideplayer.singletrack.namespace": "(命名空间: %s)",

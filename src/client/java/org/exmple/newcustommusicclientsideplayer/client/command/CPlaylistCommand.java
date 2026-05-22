@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistRepository;
@@ -71,17 +72,20 @@ public final class CPlaylistCommand {
                                                                             commandContext.getSource(),
                                                                             StringArgumentType.getString(commandContext, "playlistName"),
                                                                             false,
-                                                                            1
+                                                                            1,
+                                                                            false
                                                                     )
                                                             )
                                                             .then(
                                                                     ClientCommands.argument("startIndex", IntegerArgumentType.integer(1))
+                                                                            .suggests(CPlaylistCommand::suggestRandomPlayableStartIndex)
                                                                             .executes(
                                                                                     commandContext -> executePlay(
                                                                                             commandContext.getSource(),
                                                                                             StringArgumentType.getString(commandContext, "playlistName"),
                                                                                             false,
-                                                                                            IntegerArgumentType.getInteger(commandContext, "startIndex")
+                                                                                            IntegerArgumentType.getInteger(commandContext, "startIndex"),
+                                                                                            false
                                                                                     )
                                                                             )
                                                             )
@@ -92,17 +96,43 @@ public final class CPlaylistCommand {
                                                                                             commandContext.getSource(),
                                                                                             StringArgumentType.getString(commandContext, "playlistName"),
                                                                                             BoolArgumentType.getBool(commandContext, "loop"),
-                                                                                            1
+                                                                                            1,
+                                                                                            false
                                                                                     )
                                                                             )
                                                                             .then(
                                                                                     ClientCommands.argument("startIndex", IntegerArgumentType.integer(1))
+                                                                                            .suggests(CPlaylistCommand::suggestRandomPlayableStartIndex)
                                                                                             .executes(
                                                                                                     commandContext -> executePlay(
                                                                                                             commandContext.getSource(),
                                                                                                             StringArgumentType.getString(commandContext, "playlistName"),
                                                                                                             BoolArgumentType.getBool(commandContext, "loop"),
-                                                                                                            IntegerArgumentType.getInteger(commandContext, "startIndex")
+                                                                                                            IntegerArgumentType.getInteger(commandContext, "startIndex"),
+                                                                                                            false
+                                                                                                    )
+                                                                                            )
+                                                                                            .then(
+                                                                                                    ClientCommands.argument("shuffle", BoolArgumentType.bool())
+                                                                                                            .executes(
+                                                                                                                    commandContext -> executePlay(
+                                                                                                                            commandContext.getSource(),
+                                                                                                                            StringArgumentType.getString(commandContext, "playlistName"),
+                                                                                                                            BoolArgumentType.getBool(commandContext, "loop"),
+                                                                                                                            IntegerArgumentType.getInteger(commandContext, "startIndex"),
+                                                                                                                            BoolArgumentType.getBool(commandContext, "shuffle")
+                                                                                                                    )
+                                                                                                            )
+                                                                                            )
+                                                                            )
+                                                                            .then(
+                                                                                    ClientCommands.argument("shuffle", BoolArgumentType.bool())
+                                                                                            .executes(
+                                                                                                    commandContext -> executePlayWithoutStartIndex(
+                                                                                                            commandContext.getSource(),
+                                                                                                            StringArgumentType.getString(commandContext, "playlistName"),
+                                                                                                            BoolArgumentType.getBool(commandContext, "loop"),
+                                                                                                            BoolArgumentType.getBool(commandContext, "shuffle")
                                                                                                     )
                                                                                             )
                                                                             )
@@ -177,7 +207,20 @@ public final class CPlaylistCommand {
         }
     }
 
-    private static int executePlay(FabricClientCommandSource source, String playlistName, boolean loop, int startIndex) {
+    private static int executePlayWithoutStartIndex(FabricClientCommandSource source, String playlistName, boolean loop, boolean shuffle) {
+        return executePlay(source, playlistName, loop, 1, shuffle, !shuffle);
+    }
+
+    private static int executePlay(FabricClientCommandSource source, String playlistName, boolean loop, int startIndex, boolean shuffle) {
+        return executePlay(source, playlistName, loop, startIndex, shuffle, true);
+    }
+
+    private static int executePlay(FabricClientCommandSource source, String playlistName, boolean loop, int startIndex, boolean shuffle, boolean startIndexSpecified) {
+        if (shuffle && !loop) {
+            source.sendError(Component.translatable("command.newcustommusicclientsideplayer.playlist.shuffle_requires_loop").withStyle(ChatFormatting.RED));
+            return 0;
+        }
+
         String normalizedName = normalizePlaylistName(playlistName);
         if (normalizedName == null) {
             source.sendError(Component.translatable("command.custommusicclientsideplayer.playlist.name_empty"));
@@ -197,12 +240,35 @@ public final class CPlaylistCommand {
             return 0;
         }
 
+        if (shuffle && !startIndexSpecified) {
+            startIndex = findRandomPlayableStartIndex(source.getClient(), playlist);
+            if (startIndex < 1) {
+                source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound"));
+                return 0;
+            }
+        }
+
         if (startIndex > playlist.size()) {
             source.sendError(Component.translatable("command.custommusicclientsideplayer.playlist.start_index_out_of_range", startIndex, playlist.size()));
             return 0;
         }
 
-        return CPlaySoundController.playPlaylist(source, normalizedName, playlist, loop, startIndex - 1);
+        return CPlaySoundController.playPlaylist(source, normalizedName, playlist, loop, shuffle, startIndex - 1);
+    }
+
+    private static int findRandomPlayableStartIndex(Minecraft client, List<Identifier> playlist) {
+        java.util.ArrayList<Integer> playableIndices = new java.util.ArrayList<>();
+        for (int i = 0; i < playlist.size(); i++) {
+            if (CPlaySoundController.isTrackPlayable(client, playlist.get(i))) {
+                playableIndices.add(i + 1);
+            }
+        }
+
+        if (playableIndices.isEmpty()) {
+            return -1;
+        }
+
+        return playableIndices.get(ThreadLocalRandom.current().nextInt(playableIndices.size()));
     }
 
     private static int executeModify(FabricClientCommandSource source, String playlistName) {
@@ -264,6 +330,19 @@ public final class CPlaylistCommand {
         }
 
         return builder.buildFuture();
+    }
+
+    private static CompletableFuture<Suggestions> suggestRandomPlayableStartIndex(CommandContext<FabricClientCommandSource> context, SuggestionsBuilder builder) {
+        suggestStartIndexIfMatching(builder, 1);
+        return builder.buildFuture();
+    }
+
+    private static void suggestStartIndexIfMatching(SuggestionsBuilder builder, int startIndex) {
+        String suggestion = Integer.toString(startIndex);
+        String remaining = builder.getRemaining();
+        if (remaining.isEmpty() || suggestion.startsWith(remaining)) {
+            builder.suggest(suggestion);
+        }
     }
 
     private static String normalizeSuggestionPrefix(String prefix) {

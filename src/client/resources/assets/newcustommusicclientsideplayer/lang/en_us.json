@@ -37,6 +37,7 @@
   "command.custommusicclientsideplayer.playlist.deleted": "Deleted playlist: %s",
   "command.custommusicclientsideplayer.playlist.not_found": "Playlist not found: %s",
   "command.custommusicclientsideplayer.playlist.start_index_out_of_range": "Start index %s is out of range. Allowed: 1-%s.",
+  "command.newcustommusicclientsideplayer.playlist.shuffle_requires_loop": "Shuffle requires loop to be enabled.",
   "command.custommusicclientsideplayer.cplaylistgui.opened": "Opened cplaylist test GUI.",
 
   "screen.custommusicclientsideplayer.search": "Search...",
@@ -100,6 +101,9 @@
   "screen.custommusicclientsideplayer.play_instance.start_playing": "Start Playing",
   "screen.custommusicclientsideplayer.play_instance.start_index_invalid": "Start index must be a positive whole number!",
   "screen.custommusicclientsideplayer.play_instance.start_index_too_large": "Start index cannot exceed %s!",
+  "screen.newcustommusicclientsideplayer.play_instance.shuffle_on": "Shuffle: On",
+  "screen.newcustommusicclientsideplayer.play_instance.shuffle_off": "Shuffle: Off",
+  "screen.newcustommusicclientsideplayer.play_instance.shuffle_requires_loop": "Shuffle requires loop to be enabled.",
 
   "screen.custommusicclientsideplayer.singletrack.title": "Select A Song To Play",
   "screen.custommusicclientsideplayer.singletrack.namespace": "(Namespace: %s)",

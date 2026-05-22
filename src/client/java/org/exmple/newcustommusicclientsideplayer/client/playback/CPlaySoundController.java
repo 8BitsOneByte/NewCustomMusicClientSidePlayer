@@ -1,6 +1,7 @@
 package org.exmple.newcustommusicclientsideplayer.client.playback;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -46,8 +47,10 @@ public final class CPlaySoundController {
     private static List<Identifier> playlistQueue = List.of();
     private static List<Integer> playlistDisplayIndices = List.of();
     private static int playlistNextIndex;
+    private static int playlistCurrentIndex = -1;
     private static int playlistTotalTracks;
     private static boolean playlistLoop;
+    private static boolean playlistShuffle;
     private static boolean playlistActive;
     private static String playlistName;
     private static boolean skipNextNowPlayingHeader;
@@ -150,7 +153,7 @@ public final class CPlaySoundController {
             return SkipResult.TARGET_NOT_PLAYABLE;
         }
 
-        playlistNextIndex = targetIndex + 1;
+        markPlaylistTrackStarted(targetIndex);
         int displayIndex = playlistDisplayIndices.size() > targetIndex ? playlistDisplayIndices.get(targetIndex) : (targetIndex + 1);
         announceNowPlaying(client, soundId, displayIndex, playlistTotalTracks > 0 ? playlistTotalTracks : total);
         return SkipResult.SUCCESS;
@@ -221,6 +224,10 @@ public final class CPlaySoundController {
     }
 
     public static int playPlaylist(FabricClientCommandSource source, String name, List<Identifier> playlist, boolean loop, int startTrackIndex) {
+        return playPlaylist(source, name, playlist, loop, false, startTrackIndex);
+    }
+
+    public static int playPlaylist(FabricClientCommandSource source, String name, List<Identifier> playlist, boolean loop, boolean shuffle, int startTrackIndex) {
         Minecraft client = source.getClient();
         if (client.level == null) {
             source.sendError(Component.translatable("message.custommusicclientsideplayer.no_client_world"));
@@ -250,15 +257,17 @@ public final class CPlaySoundController {
         playlistQueue = playablePlaylist;
         playlistDisplayIndices = displayIndices;
         playlistNextIndex = startQueueIndex;
+        playlistCurrentIndex = -1;
         playlistTotalTracks = playlist.size();
         playlistLoop = loop;
+        playlistShuffle = loop && shuffle;
         playlistActive = true;
         playlistName = name;
         skipNextNowPlayingHeader = true;
 
         announcePlaylistStart(client, loop);
 
-        if (!playNextInPlaylist(client)) {
+        if (!playPlaylistIndex(client, startQueueIndex)) {
             clearPlaylistSession();
             source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound"));
             unlockMusicVolume(client);
@@ -275,6 +284,10 @@ public final class CPlaySoundController {
     }
 
     public static int playPlaylistFromUi(Minecraft client, String name, List<Identifier> playlist, boolean loop, int startTrackIndex) {
+        return playPlaylistFromUi(client, name, playlist, loop, false, startTrackIndex);
+    }
+
+    public static int playPlaylistFromUi(Minecraft client, String name, List<Identifier> playlist, boolean loop, boolean shuffle, int startTrackIndex) {
         if (client.level == null) {
             if (client.player != null) {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.no_client_world"));
@@ -315,15 +328,17 @@ public final class CPlaySoundController {
         playlistQueue = playablePlaylist;
         playlistDisplayIndices = displayIndices;
         playlistNextIndex = startQueueIndex;
+        playlistCurrentIndex = -1;
         playlistTotalTracks = playlist.size();
         playlistLoop = loop;
+        playlistShuffle = loop && shuffle;
         playlistActive = true;
         playlistName = name;
         skipNextNowPlayingHeader = true;
 
         announcePlaylistStart(client, loop);
 
-        if (!playNextInPlaylist(client)) {
+        if (!playPlaylistIndex(client, startQueueIndex)) {
             clearPlaylistSession();
             if (client.player != null) {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.no_playable_sound"));
@@ -426,8 +441,10 @@ public final class CPlaySoundController {
         playlistQueue = List.of();
         playlistDisplayIndices = List.of();
         playlistNextIndex = 0;
+        playlistCurrentIndex = -1;
         playlistTotalTracks = 0;
         playlistLoop = false;
+        playlistShuffle = false;
         playlistActive = false;
         playlistName = null;
         skipNextNowPlayingHeader = false;
@@ -442,6 +459,14 @@ public final class CPlaySoundController {
             return false;
         }
 
+        if (playlistShuffle) {
+            return playRandomNextInPlaylist(client);
+        }
+
+        return playSequentialNextInPlaylist(client);
+    }
+
+    private static boolean playSequentialNextInPlaylist(Minecraft client) {
         int total = playlistQueue.size();
         int remainingAttempts = total;
         while (remainingAttempts-- > 0) {
@@ -455,17 +480,64 @@ public final class CPlaySoundController {
             }
 
             int currentIndex = playlistNextIndex;
-            Identifier soundId = playlistQueue.get(playlistNextIndex++);
-            whiteListedSoundId = soundId;
-            if (startSound(client, soundId, false, DEFAULT_PITCH)) {
-                int displayIndex = playlistDisplayIndices.size() > currentIndex ? playlistDisplayIndices.get(currentIndex) : (currentIndex + 1);
-                announceNowPlaying(client, soundId, displayIndex, playlistTotalTracks > 0 ? playlistTotalTracks : total);
+            playlistNextIndex++;
+            if (playPlaylistIndex(client, currentIndex)) {
                 return true;
             }
         }
 
         clearPlaylistSession();
         return false;
+    }
+
+    private static boolean playRandomNextInPlaylist(Minecraft client) {
+        int total = playlistQueue.size();
+        if (total == 1) {
+            if (playPlaylistIndex(client, 0)) {
+                return true;
+            }
+
+            clearPlaylistSession();
+            return false;
+        }
+
+        int firstCandidate = ThreadLocalRandom.current().nextInt(total);
+        for (int attempts = 0; attempts < total; attempts++) {
+            int candidateIndex = (firstCandidate + attempts) % total;
+            if (candidateIndex == playlistCurrentIndex) {
+                continue;
+            }
+
+            if (playPlaylistIndex(client, candidateIndex)) {
+                return true;
+            }
+        }
+
+        clearPlaylistSession();
+        return false;
+    }
+
+    private static boolean playPlaylistIndex(Minecraft client, int queueIndex) {
+        if (queueIndex < 0 || queueIndex >= playlistQueue.size()) {
+            return false;
+        }
+
+        Identifier soundId = playlistQueue.get(queueIndex);
+        whiteListedSoundId = soundId;
+        if (!startSound(client, soundId, false, DEFAULT_PITCH)) {
+            return false;
+        }
+
+        markPlaylistTrackStarted(queueIndex);
+        int total = playlistQueue.size();
+        int displayIndex = playlistDisplayIndices.size() > queueIndex ? playlistDisplayIndices.get(queueIndex) : (queueIndex + 1);
+        announceNowPlaying(client, soundId, displayIndex, playlistTotalTracks > 0 ? playlistTotalTracks : total);
+        return true;
+    }
+
+    private static void markPlaylistTrackStarted(int queueIndex) {
+        playlistCurrentIndex = queueIndex;
+        playlistNextIndex = queueIndex + 1;
     }
 
     private static void announceNowPlaying(Minecraft client, Identifier soundId, int index, int total) {
@@ -504,7 +576,9 @@ public final class CPlaySoundController {
             .append(Component.translatable("message.custommusicclientsideplayer.start_playing_playlist"))
             .append(Component.literal(playlistName == null ? "(unknown)" : playlistName).withStyle(ChatFormatting.AQUA))
             .append(Component.literal(", loop="))
-            .append(Component.literal(loop ? "true" : "false").withStyle(loop ? ChatFormatting.GREEN : ChatFormatting.RED));
+            .append(Component.literal(loop ? "true" : "false").withStyle(loop ? ChatFormatting.GREEN : ChatFormatting.RED))
+            .append(Component.literal(", shuffle=").withStyle(ChatFormatting.WHITE))
+            .append(Component.literal(playlistShuffle ? "true" : "false").withStyle(playlistShuffle ? ChatFormatting.GREEN : ChatFormatting.RED));
         client.player.sendSystemMessage(message);
     }
 

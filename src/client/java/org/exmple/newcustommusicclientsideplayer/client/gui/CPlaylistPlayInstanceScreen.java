@@ -3,6 +3,7 @@ package org.exmple.newcustommusicclientsideplayer.client.gui;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -40,6 +41,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
     private static final Component UNKNOWN_NAMESPACE_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.common.unknown_namespace_track");
     private static final Component UNPLAYABLE_TRACK_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.common.unplayable_track");
     private static final Component START_INDEX_HINT = Component.translatable("screen.custommusicclientsideplayer.play_instance.start_index_hint").withStyle(EditBox.SEARCH_HINT_STYLE);
+    private static final Tooltip SHUFFLE_REQUIRES_LOOP_TOOLTIP = Tooltip.create(Component.translatable("screen.newcustommusicclientsideplayer.play_instance.shuffle_requires_loop"));
 
     private final Screen parent;
     private final List<Identifier> tracks;
@@ -50,9 +52,12 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
     private EditBox startIndexBox;
     private Button loopOnButton;
     private Button loopOffButton;
+    private Button shuffleOnButton;
+    private Button shuffleOffButton;
     private Button startPlayingButton;
     private Button cancelButton;
     private boolean loopEnabled = true;
+    private boolean shuffleEnabled;
     private int previewLabelCenterX;
     private int previewLabelY;
     private int startLabelX;
@@ -62,7 +67,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
 
     @FunctionalInterface
     public interface StartAction {
-        int start(boolean loop, int startIndex);
+        int start(boolean loop, boolean shuffle, int startIndex);
     }
 
     public CPlaylistPlayInstanceScreen(Screen parent, String playlistName, List<Identifier> tracks, StartAction onStart) {
@@ -98,6 +103,16 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
                 .bounds(0, 0, (ACTION_BUTTON_MAX_WIDTH - SMALL_BUTTON_GAP) / 2, 20)
                 .build()
         );
+        this.shuffleOnButton = this.addRenderableWidget(
+            Button.builder(Component.translatable("screen.newcustommusicclientsideplayer.play_instance.shuffle_on"), button -> this.setShuffleEnabled(true))
+                .bounds(0, 0, (ACTION_BUTTON_MAX_WIDTH - SMALL_BUTTON_GAP) / 2, 20)
+                .build()
+        );
+        this.shuffleOffButton = this.addRenderableWidget(
+            Button.builder(Component.translatable("screen.newcustommusicclientsideplayer.play_instance.shuffle_off"), button -> this.setShuffleEnabled(false))
+                .bounds(0, 0, (ACTION_BUTTON_MAX_WIDTH - SMALL_BUTTON_GAP) / 2, 20)
+                .build()
+        );
         this.startPlayingButton = this.addRenderableWidget(
             Button.builder(Component.translatable("screen.custommusicclientsideplayer.play_instance.start_playing"), button -> this.startPlaying())
                 .bounds(0, 0, ACTION_BUTTON_MAX_WIDTH, 20)
@@ -107,6 +122,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
 
         this.trackPreviewList.setTracks(this.tracks);
         this.updateLoopButtonLabels();
+        this.updateShuffleButtonLabels();
         this.updateValidationState();
         this.repositionElements();
         this.setInitialFocus(this.startIndexBox);
@@ -152,9 +168,21 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
             this.loopOffButton.setWidth(smallButtonWidth);
         }
 
+        if (this.shuffleOnButton != null) {
+            this.shuffleOnButton.setX(rightX);
+            this.shuffleOnButton.setY(rightY + 62);
+            this.shuffleOnButton.setWidth(smallButtonWidth);
+        }
+
+        if (this.shuffleOffButton != null) {
+            this.shuffleOffButton.setX(rightX + smallButtonWidth + SMALL_BUTTON_GAP);
+            this.shuffleOffButton.setY(rightY + 62);
+            this.shuffleOffButton.setWidth(smallButtonWidth);
+        }
+
         if (this.startPlayingButton != null) {
             this.startPlayingButton.setX(rightX);
-            this.startPlayingButton.setY(rightY + 62);
+            this.startPlayingButton.setY(rightY + 92);
             this.startPlayingButton.setWidth(rightPanelWidth);
         }
 
@@ -185,8 +213,13 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
 
     private void setLoopEnabled(boolean loopEnabled) {
         this.loopEnabled = loopEnabled;
+        if (!loopEnabled) {
+            this.shuffleEnabled = false;
+            this.clearStartIndexInput();
+        }
         this.playUiClickSound();
         this.updateLoopButtonLabels();
+        this.updateShuffleButtonLabels();
     }
 
     private void updateLoopButtonLabels() {
@@ -202,6 +235,60 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
                 Component.translatable("screen.custommusicclientsideplayer.play_instance.loop_off").withStyle(!this.loopEnabled ? ChatFormatting.GRAY : ChatFormatting.WHITE)
             );
             this.loopOffButton.active = this.loopEnabled;
+        }
+    }
+
+    private void setShuffleEnabled(boolean shuffleEnabled) {
+        if (!this.loopEnabled) {
+            return;
+        }
+
+        this.shuffleEnabled = shuffleEnabled;
+        if (shuffleEnabled) {
+            fillRandomStartIndexIfEmpty();
+        } else {
+            clearStartIndexInput();
+        }
+
+        this.playUiClickSound();
+        this.updateShuffleButtonLabels();
+        this.updateValidationState();
+    }
+
+    private void updateShuffleButtonLabels() {
+        boolean shuffleControlsEnabled = this.loopEnabled;
+        if (this.shuffleOnButton != null) {
+            ChatFormatting style = !shuffleControlsEnabled || this.shuffleEnabled ? ChatFormatting.GRAY : ChatFormatting.WHITE;
+            this.shuffleOnButton.setMessage(
+                Component.translatable("screen.newcustommusicclientsideplayer.play_instance.shuffle_on")
+                    .withStyle(style)
+            );
+            this.shuffleOnButton.active = shuffleControlsEnabled && !this.shuffleEnabled;
+            this.shuffleOnButton.setTooltip(shuffleControlsEnabled ? null : SHUFFLE_REQUIRES_LOOP_TOOLTIP);
+        }
+
+        if (this.shuffleOffButton != null) {
+            ChatFormatting style = !shuffleControlsEnabled || !this.shuffleEnabled ? ChatFormatting.GRAY : ChatFormatting.WHITE;
+            this.shuffleOffButton.setMessage(
+                Component.translatable("screen.newcustommusicclientsideplayer.play_instance.shuffle_off")
+                    .withStyle(style)
+            );
+            this.shuffleOffButton.active = shuffleControlsEnabled && this.shuffleEnabled;
+            this.shuffleOffButton.setTooltip(shuffleControlsEnabled ? null : SHUFFLE_REQUIRES_LOOP_TOOLTIP);
+        }
+    }
+
+    private void fillRandomStartIndexIfEmpty() {
+        if (this.startIndexBox == null || !this.startIndexBox.getValue().trim().isEmpty() || this.tracks.isEmpty()) {
+            return;
+        }
+
+        this.startIndexBox.setValue(String.valueOf(ThreadLocalRandom.current().nextInt(this.tracks.size()) + 1));
+    }
+
+    private void clearStartIndexInput() {
+        if (this.startIndexBox != null) {
+            this.startIndexBox.setValue("");
         }
     }
 
@@ -247,7 +334,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
             return;
         }
 
-        if (this.onStart.start(this.loopEnabled, startIndex) > 0) {
+        if (this.onStart.start(this.loopEnabled, this.shuffleEnabled, startIndex) > 0) {
             this.minecraft.setScreen(null);
         }
     }

@@ -231,13 +231,13 @@ public class CPlaylistConfigScreen extends Screen {
                 this,
                 playlistName,
                 playlist,
-                (loop, startIndex) -> this.playSelectedPlaylist(playlistName, playlist, loop, startIndex)
+                (loop, shuffle, startIndex) -> this.playSelectedPlaylist(playlistName, playlist, loop, shuffle, startIndex)
             )
         );
     }
 
-    private int playSelectedPlaylist(String playlistName, List<Identifier> playlist, boolean loop, int startTrackIndex) {
-        return CPlaySoundController.playPlaylistFromUi(this.minecraft, playlistName, playlist, loop, startTrackIndex - 1);
+    private int playSelectedPlaylist(String playlistName, List<Identifier> playlist, boolean loop, boolean shuffle, int startTrackIndex) {
+        return CPlaySoundController.playPlaylistFromUi(this.minecraft, playlistName, playlist, loop, shuffle, startTrackIndex - 1);
     }
 
     private void onEditSelected() {

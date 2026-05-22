@@ -170,7 +170,7 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
             Component boundaryMessage = offset < 0
                     ? Component.translatable("message.custommusicclientsideplayer.already_first_track").withStyle(ChatFormatting.RED)
                     : Component.translatable("message.custommusicclientsideplayer.already_last_track").withStyle(ChatFormatting.RED);
-            client.player.sendSystemMessage(boundaryMessage);
+            client.player.sendOverlayMessage(boundaryMessage);
         }
     }
 }
