@@ -20,6 +20,7 @@ import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaybackVolumeS
 import org.exmple.newcustommusicclientsideplayer.client.command.CPlaySoundCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPlaylistCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CSkipCommand;
+import org.exmple.newcustommusicclientsideplayer.client.command.CSkipRandomCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CStopSoundCommand;
 import org.exmple.newcustommusicclientsideplayer.client.gui.CMainConfigScreen;
 
@@ -71,6 +72,7 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
         CPlaySoundCommand.register();
         CStopSoundCommand.register();
         CSkipCommand.register();
+        CSkipRandomCommand.register();
         CPlaylistCommand.register();
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

@@ -159,6 +159,41 @@ public final class CPlaySoundController {
         return SkipResult.SUCCESS;
     }
 
+    public static SkipResult skipPlaylistRandom() {
+        if (!isPlaylistModeActive() || playlistQueue.isEmpty()) {
+            return SkipResult.NOT_IN_PLAYLIST_MODE;
+        }
+
+        if (isSwitchLocked()) {
+            return SkipResult.SWITCH_LOCKED;
+        }
+
+        Minecraft client = Minecraft.getInstance();
+        int total = playlistQueue.size();
+        if (total == 1) {
+            return playPlaylistIndex(client, 0) ? SkipResult.SUCCESS : SkipResult.TARGET_NOT_PLAYABLE;
+        }
+
+        int currentIndex = playlistCurrentIndex;
+        if (currentIndex < 0 || currentIndex >= total) {
+            currentIndex = Math.floorMod(playlistNextIndex - 1, total);
+        }
+
+        int firstCandidate = ThreadLocalRandom.current().nextInt(total);
+        for (int attempts = 0; attempts < total; attempts++) {
+            int targetIndex = (firstCandidate + attempts) % total;
+            if (targetIndex == currentIndex) {
+                continue;
+            }
+
+            if (playPlaylistIndex(client, targetIndex)) {
+                return SkipResult.SUCCESS;
+            }
+        }
+
+        return SkipResult.TARGET_NOT_PLAYABLE;
+    }
+
     public static int play(FabricClientCommandSource source, Identifier soundId) {
         return play(source, soundId, false);
     }
