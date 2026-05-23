@@ -17,8 +17,10 @@ import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import org.lwjgl.glfw.GLFW;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaybackVolumeSettings;
+import org.exmple.newcustommusicclientsideplayer.client.command.CPauseCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPlaySoundCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPlaylistCommand;
+import org.exmple.newcustommusicclientsideplayer.client.command.CResumeCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CSkipCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CSkipRandomCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CStopSoundCommand;
@@ -58,6 +60,11 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
             GLFW.GLFW_KEY_RIGHT,
             CUSTOM_KEY_CATEGORY
     );
+    private static final KeyMapping TOGGLE_PAUSE_KEY = new KeyMapping(
+            "key.newcustommusicclientsideplayer.toggle_pause",
+            GLFW.GLFW_KEY_Y,
+            CUSTOM_KEY_CATEGORY
+    );
 
     @Override
     public void onInitializeClient() {
@@ -68,8 +75,11 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
         KeyMappingHelper.registerKeyMapping(VOLUME_DOWN_KEY);
         KeyMappingHelper.registerKeyMapping(PREVIOUS_TRACK_KEY);
         KeyMappingHelper.registerKeyMapping(NEXT_TRACK_KEY);
+        KeyMappingHelper.registerKeyMapping(TOGGLE_PAUSE_KEY);
 
         CPlaySoundCommand.register();
+        CPauseCommand.register();
+        CResumeCommand.register();
         CStopSoundCommand.register();
         CSkipCommand.register();
         CSkipRandomCommand.register();
@@ -88,6 +98,10 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
 
             while (VOLUME_DOWN_KEY.consumeClick()) {
                 showVolumeAdjustFeedback(client, CPlaySoundController.adjustPlaybackVolume(-5));
+            }
+
+            while (TOGGLE_PAUSE_KEY.consumeClick()) {
+                handleTogglePauseKey(client);
             }
 
             boolean previousDown = PREVIOUS_TRACK_KEY.isDown();
@@ -143,6 +157,23 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
         }
 
         client.player.sendOverlayMessage(message);
+    }
+
+    private static void handleTogglePauseKey(Minecraft client) {
+        CPlaySoundController.PauseResult result = CPlaySoundController.togglePause();
+        if (client.player == null) {
+            return;
+        }
+
+        Component message = switch (result) {
+            case PAUSED -> Component.translatable("message.newcustommusicclientsideplayer.pause.paused").withStyle(ChatFormatting.RED);
+            case RESUMED -> Component.translatable("message.newcustommusicclientsideplayer.pause.resumed").withStyle(ChatFormatting.GREEN);
+            case NO_PLAYBACK, NOT_PAUSED -> Component.translatable("message.newcustommusicclientsideplayer.pause.no_playback").withStyle(ChatFormatting.RED);
+        };
+        client.player.sendOverlayMessage(message);
+        if (result == CPlaySoundController.PauseResult.PAUSED || result == CPlaySoundController.PauseResult.RESUMED) {
+            client.player.sendSystemMessage(message);
+        }
     }
 
     private static void handlePlaylistArrowSkip(Minecraft client, int offset) {

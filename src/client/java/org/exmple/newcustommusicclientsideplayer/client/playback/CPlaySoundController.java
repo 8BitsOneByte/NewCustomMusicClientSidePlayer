@@ -1,12 +1,15 @@
 package org.exmple.newcustommusicclientsideplayer.client.playback;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.client.sounds.ChannelAccess;
+import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -15,6 +18,8 @@ import net.minecraft.sounds.SoundSource;
 import org.exmple.newcustommusicclientsideplayer.client.customnowplayingtoast.CCustomNowPlayingToast;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaybackVolumeSettings;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
+import org.exmple.newcustommusicclientsideplayer.mixin.client.SoundEngineAccessor;
+import org.exmple.newcustommusicclientsideplayer.mixin.client.SoundManagerAccessor;
 
 public final class CPlaySoundController {
     private static final int STARTUP_GRACE_TICKS = 20;
@@ -34,6 +39,13 @@ public final class CPlaySoundController {
         OUT_OF_BOUNDARY,
         TARGET_NOT_PLAYABLE,
         SWITCH_LOCKED
+    }
+
+    public enum PauseResult {
+        PAUSED,
+        RESUMED,
+        NO_PLAYBACK,
+        NOT_PAUSED
     }
 
     public enum VolumeAdjustResult {
@@ -62,6 +74,7 @@ public final class CPlaySoundController {
     private static int startupGraceTicks;
     private static boolean currentSoundObservedActive;
     private static Identifier whiteListedSoundId;
+    private static boolean customPaused;
 
     private CPlaySoundController() {
     }
@@ -76,6 +89,10 @@ public final class CPlaySoundController {
 
     public static boolean hasActivePlayback() {
         return currentSound != null || currentSoundId != null || playlistActive;
+    }
+
+    public static boolean isCustomPaused() {
+        return customPaused;
     }
 
     public static boolean isPlaylistModeActive() {
@@ -192,6 +209,48 @@ public final class CPlaySoundController {
         }
 
         return SkipResult.TARGET_NOT_PLAYABLE;
+    }
+
+    public static PauseResult togglePause() {
+        Minecraft client = Minecraft.getInstance();
+        if (!hasActivePlayback()) {
+            customPaused = false;
+            return PauseResult.NO_PLAYBACK;
+        }
+
+        if (customPaused) {
+            if (!resumeCurrentSound(client)) {
+                customPaused = false;
+                return PauseResult.NO_PLAYBACK;
+            }
+
+            customPaused = false;
+            return PauseResult.RESUMED;
+        }
+
+        if (!pauseCurrentSound(client)) {
+            customPaused = false;
+            return PauseResult.NO_PLAYBACK;
+        }
+
+        customPaused = true;
+        return PauseResult.PAUSED;
+    }
+
+    public static PauseResult resumePaused() {
+        Minecraft client = Minecraft.getInstance();
+        if (!customPaused || !hasActivePlayback()) {
+            customPaused = false;
+            return PauseResult.NOT_PAUSED;
+        }
+
+        if (!resumeCurrentSound(client)) {
+            customPaused = false;
+            return PauseResult.NO_PLAYBACK;
+        }
+
+        customPaused = false;
+        return PauseResult.RESUMED;
     }
 
     public static int play(FabricClientCommandSource source, Identifier soundId) {
@@ -394,6 +453,16 @@ public final class CPlaySoundController {
 
     public static void tick(Minecraft client) {
         if (client.level == null) {
+            return;
+        }
+
+        if (customPaused) {
+            if (!hasActivePlayback()) {
+                customPaused = false;
+                return;
+            }
+
+            pauseCurrentSound(client);
             return;
         }
 
@@ -683,6 +752,31 @@ public final class CPlaySoundController {
             client,
             Component.literal(soundId.getNamespace() + "-" + getDisplayName(soundId))
         );
+    }
+
+    private static boolean pauseCurrentSound(Minecraft client) {
+        return executeOnCurrentSoundChannel(client, channel -> channel.pause());
+    }
+
+    private static boolean resumeCurrentSound(Minecraft client) {
+        return executeOnCurrentSoundChannel(client, channel -> channel.unpause());
+    }
+
+    private static boolean executeOnCurrentSoundChannel(Minecraft client, java.util.function.Consumer<com.mojang.blaze3d.audio.Channel> action) {
+        if (client == null || currentSound == null) {
+            return false;
+        }
+
+        SoundEngine soundEngine = ((SoundManagerAccessor) client.getSoundManager()).newcustommusicclientsideplayer$getSoundEngine();
+        Map<SoundInstance, ChannelAccess.ChannelHandle> instanceToChannel =
+            ((SoundEngineAccessor) soundEngine).newcustommusicclientsideplayer$getInstanceToChannel();
+        ChannelAccess.ChannelHandle channelHandle = instanceToChannel.get(currentSound);
+        if (channelHandle == null || channelHandle.isStopped()) {
+            return false;
+        }
+
+        channelHandle.execute(action);
+        return true;
     }
 
     private static List<Identifier> filterPlayableSounds(Minecraft client, List<Identifier> sounds) {

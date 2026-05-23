@@ -5,6 +5,7 @@
   "key.custommusicclientsideplayer.volume_down": "降低音量",
   "key.custommusicclientsideplayer.previous_track": "前一曲",
   "key.custommusicclientsideplayer.next_track": "后一曲",
+  "key.newcustommusicclientsideplayer.toggle_pause": "暂停/恢复播放",
 
   "mode.custommusicclientsideplayer.playlist": "[列表模式]",
   "mode.custommusicclientsideplayer.singletrack": "[单曲模式]",
@@ -22,9 +23,14 @@
   "message.custommusicclientsideplayer.now_playing_header": "正在播放:",
   "message.custommusicclientsideplayer.start_playing_playlist": "\n开始播放列表 ",
   "message.custommusicclientsideplayer.start_playing_single": "开始播放 ",
+  "message.newcustommusicclientsideplayer.pause.paused": "实例已暂停!",
+  "message.newcustommusicclientsideplayer.pause.resumed": "实例已恢复!",
+  "message.newcustommusicclientsideplayer.pause.no_playback": "未找到播放实例!",
 
   "command.custommusicclientsideplayer.cstopsound.not_found": "未发现正在播放的声音实例!",
   "command.custommusicclientsideplayer.cstopsound.stopped": "播放已停止!",
+  "command.newcustommusicclientsideplayer.pause.no_playback": "您必须有一个播放实例才能使用此命令!",
+  "command.newcustommusicclientsideplayer.resume.no_paused_playback": "您必须有一个暂停的播放实例才能使用此命令!",
   "command.custommusicclientsideplayer.skip.not_in_playlist_mode": "您必须在列表模式下才能使用此命令!",
   "command.custommusicclientsideplayer.skip.out_of_boundary": "索引越界!",
   "command.custommusicclientsideplayer.skip.target_not_playable": "目标曲目不可播放!",

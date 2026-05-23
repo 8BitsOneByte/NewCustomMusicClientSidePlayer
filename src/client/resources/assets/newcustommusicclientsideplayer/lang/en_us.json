@@ -5,6 +5,7 @@
   "key.custommusicclientsideplayer.volume_down": "Volume Down",
   "key.custommusicclientsideplayer.previous_track": "Previous Track",
   "key.custommusicclientsideplayer.next_track": "Next Track",
+  "key.newcustommusicclientsideplayer.toggle_pause": "Toggle Pause",
 
   "mode.custommusicclientsideplayer.playlist": "[Playlist Mode]",
   "mode.custommusicclientsideplayer.singletrack": "[SingleTrack Mode]",
@@ -22,9 +23,14 @@
   "message.custommusicclientsideplayer.now_playing_header": "Now Playing:",
   "message.custommusicclientsideplayer.start_playing_playlist": "\nStart playing playlist ",
   "message.custommusicclientsideplayer.start_playing_single": "Start playing ",
+  "message.newcustommusicclientsideplayer.pause.paused": "Instance Paused!",
+  "message.newcustommusicclientsideplayer.pause.resumed": "Instance Resumed!",
+  "message.newcustommusicclientsideplayer.pause.no_playback": "No Playback Instance Found!",
 
   "command.custommusicclientsideplayer.cstopsound.not_found": "Current playing sounds not found!",
   "command.custommusicclientsideplayer.cstopsound.stopped": "Session stopped!",
+  "command.newcustommusicclientsideplayer.pause.no_playback": "You must have an active playback instance to use this command.",
+  "command.newcustommusicclientsideplayer.resume.no_paused_playback": "You must have a paused playback instance to use this command.",
   "command.custommusicclientsideplayer.skip.not_in_playlist_mode": "You must be in playlist mode to use this command!",
   "command.custommusicclientsideplayer.skip.out_of_boundary": "Index out of boundary!",
   "command.custommusicclientsideplayer.skip.target_not_playable": "Target track is not playable!",
