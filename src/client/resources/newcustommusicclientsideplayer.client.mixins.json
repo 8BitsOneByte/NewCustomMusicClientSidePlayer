@@ -4,8 +4,11 @@
   "package": "org.exmple.newcustommusicclientsideplayer.mixin.client",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "ChannelAccessCancellationMixin",
+    "ChannelHandleCancellationMixin",
     "MinecraftLevelChangeSoundMixin",
     "MinecraftPauseSoundMixin",
+    "SoundEngineAsyncPlaybackMixin",
     "SoundEngineAccessor",
     "SoundManagerAccessor"
   ],

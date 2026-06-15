@@ -40,10 +40,6 @@ public final class CSkipCommand {
                 source.sendError(Component.translatable("command.custommusicclientsideplayer.skip.target_not_playable").withStyle(ChatFormatting.RED));
                 yield 0;
             }
-            case SWITCH_LOCKED -> {
-                source.sendError(Component.translatable("command.custommusicclientsideplayer.skip.switch_locked").withStyle(ChatFormatting.RED));
-                yield 0;
-            }
             case NOT_IN_PLAYLIST_MODE -> {
                 source.sendError(Component.translatable("command.custommusicclientsideplayer.skip.not_in_playlist_mode").withStyle(ChatFormatting.RED));
                 yield 0;

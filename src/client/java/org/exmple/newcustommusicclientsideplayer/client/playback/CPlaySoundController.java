@@ -6,7 +6,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.client.sounds.SoundEngine;
@@ -22,7 +21,6 @@ import org.exmple.newcustommusicclientsideplayer.mixin.client.SoundEngineAccesso
 import org.exmple.newcustommusicclientsideplayer.mixin.client.SoundManagerAccessor;
 
 public final class CPlaySoundController {
-    private static final int STARTUP_GRACE_TICKS = 20;
     public static final float DEFAULT_PITCH = 1.0F;
     public static final float DISPLAY_PITCH_MIN = 0.5F;
     public static final float DISPLAY_PITCH_MAX = 2.0F;
@@ -37,8 +35,7 @@ public final class CPlaySoundController {
         SUCCESS,
         NOT_IN_PLAYLIST_MODE,
         OUT_OF_BOUNDARY,
-        TARGET_NOT_PLAYABLE,
-        SWITCH_LOCKED
+        TARGET_NOT_PLAYABLE
     }
 
     public enum PauseResult {
@@ -54,8 +51,7 @@ public final class CPlaySoundController {
         ALREADY_MAX
     }
 
-    private static SoundInstance currentSound;
-    private static Identifier currentSoundId;
+    private static final COwnedSoundRegistry OWNED_SOUNDS = new COwnedSoundRegistry();
     private static List<Identifier> playlistQueue = List.of();
     private static List<Integer> playlistDisplayIndices = List.of();
     private static int playlistNextIndex;
@@ -70,25 +66,21 @@ public final class CPlaySoundController {
     private static double cachedMusicVolume;
     private static SessionMode lastSessionMode = SessionMode.NONE;
     private static int playbackVolumePercent = 100;
-    private static int inactiveTickCount;
-    private static int startupGraceTicks;
-    private static boolean currentSoundObservedActive;
-    private static Identifier whiteListedSoundId;
     private static boolean customPaused;
 
     private CPlaySoundController() {
     }
 
     public static boolean shouldKeepMasterDuringPause() {
-        return currentSound != null || currentSoundId != null || playlistActive;
+        return OWNED_SOUNDS.hasOwnedSounds() || playlistActive;
     }
 
     public static boolean shouldKeepPlayingDuringLevelChange() {
-        return currentSound != null || currentSoundId != null || playlistActive;
+        return OWNED_SOUNDS.hasOwnedSounds() || playlistActive;
     }
 
     public static boolean hasActivePlayback() {
-        return currentSound != null || currentSoundId != null || playlistActive;
+        return OWNED_SOUNDS.hasOwnedSounds() || playlistActive;
     }
 
     public static boolean isCustomPaused() {
@@ -117,8 +109,9 @@ public final class CPlaySoundController {
         } catch (Exception ignored) {
         }
 
-        if (currentSound instanceof AdjustableSoundInstance adjustableSoundInstance) {
-            adjustableSoundInstance.setBaseVolume(playbackVolumePercent / 100.0F);
+        CManagedSoundInstance managedSoundInstance = OWNED_SOUNDS.current();
+        if (managedSoundInstance != null) {
+            managedSoundInstance.setBaseVolume(playbackVolumePercent / 100.0F);
             Minecraft.getInstance().getSoundManager().refreshCategoryVolume(SoundSource.MASTER);
         }
 
@@ -151,10 +144,6 @@ public final class CPlaySoundController {
             return SkipResult.NOT_IN_PLAYLIST_MODE;
         }
 
-        if (isSwitchLocked()) {
-            return SkipResult.SWITCH_LOCKED;
-        }
-
         Minecraft client = Minecraft.getInstance();
         int total = playlistQueue.size();
         int currentIndex = Math.floorMod(playlistNextIndex - 1, total);
@@ -165,7 +154,6 @@ public final class CPlaySoundController {
 
         int targetIndex = Math.floorMod(rawTargetIndex, total);
         Identifier soundId = playlistQueue.get(targetIndex);
-        whiteListedSoundId = soundId;
         if (!startSound(client, soundId, false, DEFAULT_PITCH)) {
             return SkipResult.TARGET_NOT_PLAYABLE;
         }
@@ -179,10 +167,6 @@ public final class CPlaySoundController {
     public static SkipResult skipPlaylistRandom() {
         if (!isPlaylistModeActive() || playlistQueue.isEmpty()) {
             return SkipResult.NOT_IN_PLAYLIST_MODE;
-        }
-
-        if (isSwitchLocked()) {
-            return SkipResult.SWITCH_LOCKED;
         }
 
         Minecraft client = Minecraft.getInstance();
@@ -270,7 +254,6 @@ public final class CPlaySoundController {
 
         clearPlaylistSession();
         forceStopTrackedSound(client);
-        whiteListedSoundId = soundId;
         if (!startSound(client, soundId, loop, pitch)) {
             source.sendError(Component.translatable("message.custommusicclientsideplayer.unknown_sound_id", soundId.toString()));
             return 0;
@@ -296,7 +279,6 @@ public final class CPlaySoundController {
 
         clearPlaylistSession();
         forceStopTrackedSound(client);
-        whiteListedSoundId = soundId;
         if (!startSound(client, soundId, loop, pitch)) {
             if (client.player != null) {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.unknown_sound_id", soundId.toString()));
@@ -456,6 +438,8 @@ public final class CPlaySoundController {
             return;
         }
 
+        OWNED_SOUNDS.recoverRetiredSounds(client);
+
         if (customPaused) {
             if (!hasActivePlayback()) {
                 customPaused = false;
@@ -466,31 +450,13 @@ public final class CPlaySoundController {
             return;
         }
 
-        if (currentSound != null) {
-            if (client.getSoundManager().isActive(currentSound)) {
-                currentSoundObservedActive = true;
-                startupGraceTicks = 0;
-                inactiveTickCount = 0;
-            } else if (!currentSoundObservedActive) {
-                if (startupGraceTicks > 0) {
-                    startupGraceTicks--;
-                } else {
-                    currentSound = null;
-                    currentSoundId = null;
-                    inactiveTickCount = 0;
-                }
-            } else if (++inactiveTickCount >= 3) {
-                currentSound = null;
-                currentSoundId = null;
-                inactiveTickCount = 0;
-            }
-        }
+        OWNED_SOUNDS.releaseFinishedCurrent(client);
 
-        if (currentSound == null && playlistActive && playNextInPlaylist(client)) {
+        if (!OWNED_SOUNDS.hasCurrent() && playlistActive && playNextInPlaylist(client)) {
             return;
         }
 
-        if (musicVolumeLocked && currentSound == null && !playlistActive) {
+        if (musicVolumeLocked && !OWNED_SOUNDS.hasCurrent() && !playlistActive) {
             unlockMusicVolume(client);
         }
     }
@@ -514,7 +480,7 @@ public final class CPlaySoundController {
         clearPlaylistSession();
 
         if (stopSound) {
-            forceStopTrackedSound(client);
+            forceStopTrackedSound(client, "SESSION_STOP");
         }
 
         unlockMusicVolume(client);
@@ -552,10 +518,6 @@ public final class CPlaySoundController {
         playlistActive = false;
         playlistName = null;
         skipNextNowPlayingHeader = false;
-    }
-
-    private static boolean isSwitchLocked() {
-        return currentSound != null && !currentSoundObservedActive && startupGraceTicks > 0;
     }
 
     private static boolean playNextInPlaylist(Minecraft client) {
@@ -627,7 +589,6 @@ public final class CPlaySoundController {
         }
 
         Identifier soundId = playlistQueue.get(queueIndex);
-        whiteListedSoundId = soundId;
         if (!startSound(client, soundId, false, DEFAULT_PITCH)) {
             return false;
         }
@@ -713,18 +674,14 @@ public final class CPlaySoundController {
 
     private static boolean startSound(Minecraft client, Identifier soundId, boolean loop, float pitch) {
         SoundManager soundManager = client.getSoundManager();
-        if (whiteListedSoundId != null && !soundId.equals(whiteListedSoundId)) {
-            return false;
-        }
-
         if (!isTrackPlayable(client, soundId)) {
             return false;
         }
 
-        forceStopTrackedSound(client);
+        forceStopTrackedSound(client, "TRACK_REPLACED");
 
         lockMusicVolume(client);
-        currentSound = new AdjustableSoundInstance(
+        CManagedSoundInstance managedSound = new CManagedSoundInstance(
             soundId,
             SoundSource.MASTER,
             playbackVolumePercent / 100.0F,
@@ -738,11 +695,8 @@ public final class CPlaySoundController {
             0.0,
             true
         );
-        currentSoundId = soundId;
-        inactiveTickCount = 0;
-        startupGraceTicks = STARTUP_GRACE_TICKS;
-        currentSoundObservedActive = false;
-        soundManager.play(currentSound);
+        OWNED_SOUNDS.activate(managedSound);
+        soundManager.play(managedSound);
         showCustomNowPlayingToast(client, soundId);
         return true;
     }
@@ -763,6 +717,7 @@ public final class CPlaySoundController {
     }
 
     private static boolean executeOnCurrentSoundChannel(Minecraft client, java.util.function.Consumer<com.mojang.blaze3d.audio.Channel> action) {
+        CManagedSoundInstance currentSound = OWNED_SOUNDS.current();
         if (client == null || currentSound == null) {
             return false;
         }
@@ -814,43 +769,15 @@ public final class CPlaySoundController {
     }
 
     private static void forceStopTrackedSound(Minecraft client) {
-        SoundManager soundManager = client.getSoundManager();
-        if (currentSound != null) {
-            soundManager.stop(currentSound);
-            currentSound = null;
-        }
-
-        if (currentSoundId != null) {
-            soundManager.stop(currentSoundId, SoundSource.MASTER);
-            currentSoundId = null;
-        }
-
-        inactiveTickCount = 0;
-        startupGraceTicks = 0;
-        currentSoundObservedActive = false;
-        whiteListedSoundId = null;
+        forceStopTrackedSound(client, "TRACK_REPLACED");
     }
 
-    private static final class AdjustableSoundInstance extends SimpleSoundInstance {
-        private AdjustableSoundInstance(
-            Identifier identifier,
-            SoundSource soundSource,
-            float volume,
-            float pitch,
-            net.minecraft.util.RandomSource randomSource,
-            boolean looping,
-            int delay,
-            SoundInstance.Attenuation attenuation,
-            double x,
-            double y,
-            double z,
-            boolean relative
-        ) {
-            super(identifier, soundSource, volume, pitch, randomSource, looping, delay, attenuation, x, y, z, relative);
-        }
-
-        private void setBaseVolume(float volume) {
-            this.volume = volume;
+    private static void forceStopTrackedSound(Minecraft client, String reason) {
+        if ("SESSION_STOP".equals(reason)) {
+            OWNED_SOUNDS.stopAll(client);
+        } else {
+            OWNED_SOUNDS.retireCurrent(client);
         }
     }
+
 }
