@@ -43,9 +43,9 @@ public final class CMainConfigScreen extends Screen {
     private static final Component RANDOM_TIP = Component.translatable("screen.custommusicclientsideplayer.main_menu.random_tip");
     private static final Component NEXT_TIP = Component.translatable("screen.custommusicclientsideplayer.main_menu.next_tip");
 
-    private static final String SOURCE_URL = "https://github.com/8BitsOneByte/CustomMusicClientSidePlayer";
-    private static final String REPORT_BUGS_URL = "https://github.com/8BitsOneByte/CustomMusicClientSidePlayer/issues";
-    private static final String MODRINTH_URL = "https://not.completed.yet.com";
+    private static final String SOURCE_URL = "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/tree/master";
+    private static final String REPORT_BUGS_URL = "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/issues";
+    private static final String MODRINTH_URL = "https://modrinth.com/mod/new-custom-music-client-side-player";
     private static final String GITHUB_URL = "https://github.com/8BitsOneByte";
 
     private final Screen parent;
