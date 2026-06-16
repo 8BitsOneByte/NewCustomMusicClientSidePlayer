@@ -167,6 +167,11 @@
   "screen.custommusicclientsideplayer.main_menu.tip.5": " Music will keep playing when changing dimensions, and won't stop when the game is paused, but won't continue to the next track after the current one finishes until you unpause the game.",
   "screen.custommusicclientsideplayer.main_menu.tip.6": " /cstopsound and /stopsong have same functionality.",
   "screen.custommusicclientsideplayer.main_menu.tip.7":" When tracks from resource packs are added to playlist and then the resource packs are removed, those tracks will be skipped. You can re-add the resource packs to make the unavailable tracks playable again.",
-  "screen.custommusicclientsideplayer.main_menu.tip.8":"In playlist mode:\n/skip n: skip n tracks\n/skip -n: go back n tracks\n/skip 0: replay the current track\nloop=true: playlist is treated as circular index; loop=false: stop at the ends."
+  "screen.custommusicclientsideplayer.main_menu.tip.8":"In playlist mode:\n/skip n: skip n tracks\n/skip -n: go back n tracks\n/skip 0: replay the current track\nloop=true: playlist is treated as circular index; loop=false: stop at the ends.",
+
+  "screen.custommusicclientsideplayer.update.available": "New version available!",
+  "screen.custommusicclientsideplayer.update.latest_version": "Latest Version: %s",
+  "screen.custommusicclientsideplayer.update.updated_at": "Last Updated At: %s",
+  "screen.custommusicclientsideplayer.update.changelog": "Changelog:"
 }
 

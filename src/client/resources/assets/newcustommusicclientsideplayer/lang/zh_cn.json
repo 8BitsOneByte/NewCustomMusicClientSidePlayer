@@ -167,6 +167,11 @@
   "screen.custommusicclientsideplayer.main_menu.tip.5": "切换维度时音乐会正常播放，游戏暂停时正在播放的音乐不会停止，但无法在当前音乐结束后继续播放，除非解除暂停状态.",
   "screen.custommusicclientsideplayer.main_menu.tip.6":"/cstopsound和/stopsong具有相同的功能.",
   "screen.custommusicclientsideplayer.main_menu.tip.7":"当来自资源包的曲目被添加进播放列表且该资源包被移除时，这些曲目将被跳过，你可以重新添加资源包使得这些曲目可以正常播放.",
-  "screen.custommusicclientsideplayer.main_menu.tip.8":"在播放列表模式下：\n/skip n：跳过n首曲目\n/skip -n: 回退n首曲目\n/skip 0：重新播放当前曲目\nloop=true：使用环形索引；loop=false：不能越过首尾。"
+  "screen.custommusicclientsideplayer.main_menu.tip.8":"在播放列表模式下：\n/skip n：跳过n首曲目\n/skip -n: 回退n首曲目\n/skip 0：重新播放当前曲目\nloop=true：使用环形索引；loop=false：不能越过首尾。",
+
+  "screen.custommusicclientsideplayer.update.available": "有可用新版本！",
+  "screen.custommusicclientsideplayer.update.latest_version": "最新版本: %s",
+  "screen.custommusicclientsideplayer.update.updated_at": "最近更新于: %s",
+  "screen.custommusicclientsideplayer.update.changelog": "更新日志:"
 }
 

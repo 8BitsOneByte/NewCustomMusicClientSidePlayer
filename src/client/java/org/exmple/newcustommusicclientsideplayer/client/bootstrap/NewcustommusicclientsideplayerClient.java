@@ -25,6 +25,7 @@ import org.exmple.newcustommusicclientsideplayer.client.command.CSkipCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CSkipRandomCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CStopSoundCommand;
 import org.exmple.newcustommusicclientsideplayer.client.gui.CMainConfigScreen;
+import org.exmple.newcustommusicclientsideplayer.client.update.CUpdateChecker;
 
 public class NewcustommusicclientsideplayerClient implements ClientModInitializer {
     public static final String MOD_ID = "newcustommusicclientsideplayer";
@@ -138,6 +139,8 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
                     }
                 }
         );
+
+        CUpdateChecker.initialize();
     }
 
     private static void showVolumeAdjustFeedback(Minecraft client, CPlaySoundController.VolumeAdjustResult result) {

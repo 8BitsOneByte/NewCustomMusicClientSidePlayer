@@ -17,6 +17,10 @@ import net.minecraft.locale.Language;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+import org.exmple.newcustommusicclientsideplayer.client.gui.update.CUpdateBadgeRenderer;
+import org.exmple.newcustommusicclientsideplayer.client.gui.update.CUpdateTooltipBuilder;
+import org.exmple.newcustommusicclientsideplayer.client.update.CUpdateChecker;
+import org.exmple.newcustommusicclientsideplayer.client.update.CUpdateStatus;
 
 public final class CMainConfigScreen extends Screen {
     private static final String TIP_KEY_PREFIX = "screen.custommusicclientsideplayer.main_menu.tip.";
@@ -51,6 +55,8 @@ public final class CMainConfigScreen extends Screen {
     private final Screen parent;
     private HeaderAndFooterLayout layout;
     private MultiLineTextWidget tipWidget;
+    private Button modrinthButton;
+    private CUpdateStatus updateStatus;
     private List<Component> tips;
     private int tipIndex;
 
@@ -74,7 +80,9 @@ public final class CMainConfigScreen extends Screen {
         adder.addChild(new StringWidget(MOD_LINKS, this.font), 2);
         adder.addChild(Button.builder(SOURCE, ConfirmLinkScreen.confirmLink(this, SOURCE_URL)).width(LINK_BUTTON_WIDTH).build());
         adder.addChild(Button.builder(REPORT_BUGS, ConfirmLinkScreen.confirmLink(this, REPORT_BUGS_URL)).width(LINK_BUTTON_WIDTH).build());
-        adder.addChild(Button.builder(MODRINTH, ConfirmLinkScreen.confirmLink(this, MODRINTH_URL)).width(LINK_BUTTON_WIDTH).build());
+        this.modrinthButton = Button.builder(MODRINTH, ConfirmLinkScreen.confirmLink(this, MODRINTH_URL)).width(LINK_BUTTON_WIDTH).build();
+        this.applyModrinthUpdateTooltip();
+        adder.addChild(this.modrinthButton);
         adder.addChild(Button.builder(GITHUB, ConfirmLinkScreen.confirmLink(this, GITHUB_URL)).width(LINK_BUTTON_WIDTH).build());
 
         this.tips = this.loadTips();
@@ -109,6 +117,8 @@ public final class CMainConfigScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
+        this.refreshModrinthUpdateStatus();
+        CUpdateBadgeRenderer.render(guiGraphics, this.modrinthButton, this.updateStatus);
     }
 
     private void onSingleTrackMode() {
@@ -121,6 +131,17 @@ public final class CMainConfigScreen extends Screen {
         if (this.minecraft != null) {
             this.minecraft.setScreen(new CPlaylistConfigScreen(this));
         }
+    }
+
+    private void applyModrinthUpdateTooltip() {
+        this.refreshModrinthUpdateStatus();
+        if (this.updateStatus.updateAvailable()) {
+            this.modrinthButton.setTooltip(CUpdateTooltipBuilder.build(this.updateStatus));
+        }
+    }
+
+    private void refreshModrinthUpdateStatus() {
+        this.updateStatus = CUpdateChecker.getStatus();
     }
 
     private void rollRandomTip() {
