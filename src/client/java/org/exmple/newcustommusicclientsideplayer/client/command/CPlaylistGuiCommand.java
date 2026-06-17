@@ -23,7 +23,7 @@ public final class CPlaylistGuiCommand {
 
     private static int openGui(FabricClientCommandSource source) {
         Minecraft client = source.getClient();
-        client.execute(() -> client.setScreen(new CPlaylistTestScreen(client.screen)));
+        client.execute(() -> client.gui.setScreen(new CPlaylistTestScreen(client.gui.screen())));
         source.sendFeedback(Component.translatable("command.custommusicclientsideplayer.cplaylistgui.opened"));
         return 1;
     }

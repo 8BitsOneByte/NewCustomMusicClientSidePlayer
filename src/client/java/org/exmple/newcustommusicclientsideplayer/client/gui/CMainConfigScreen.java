@@ -110,7 +110,7 @@ public final class CMainConfigScreen extends Screen {
     @Override
     public void onClose() {
         if (this.minecraft != null) {
-            this.minecraft.setScreen(this.parent);
+            this.minecraft.gui.setScreen(this.parent);
         }
     }
 
@@ -123,13 +123,13 @@ public final class CMainConfigScreen extends Screen {
 
     private void onSingleTrackMode() {
         if (this.minecraft != null) {
-            this.minecraft.setScreen(new CSingleTrackSelectScreen(this));
+            this.minecraft.gui.setScreen(new CSingleTrackSelectScreen(this));
         }
     }
 
     private void onPlaylistMode() {
         if (this.minecraft != null) {
-            this.minecraft.setScreen(new CPlaylistConfigScreen(this));
+            this.minecraft.gui.setScreen(new CPlaylistConfigScreen(this));
         }
     }
 

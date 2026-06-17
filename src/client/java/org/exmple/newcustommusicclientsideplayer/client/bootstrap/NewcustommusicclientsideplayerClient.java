@@ -90,7 +90,7 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
             CPlaySoundController.tick(client);
 
             while (OPEN_PLAYLIST_CONFIG_KEY.consumeClick()) {
-                client.setScreen(new CMainConfigScreen(client.screen));
+                client.gui.setScreen(new CMainConfigScreen(client.gui.screen()));
             }
 
             while (VOLUME_UP_KEY.consumeClick()) {

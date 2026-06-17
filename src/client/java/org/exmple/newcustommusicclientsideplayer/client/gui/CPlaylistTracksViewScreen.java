@@ -93,7 +93,7 @@ public final class CPlaylistTracksViewScreen extends Screen {
 
     @Override
     public void onClose() {
-        this.minecraft.setScreen(this.parent);
+        this.minecraft.gui.setScreen(this.parent);
     }
 
     private static String getDisplayName(Identifier id) {
@@ -138,7 +138,7 @@ public final class CPlaylistTracksViewScreen extends Screen {
             }
         }
 
-        this.minecraft.setScreen(
+        this.minecraft.gui.setScreen(
             new CRenameTrackScreen(this, selectedTrack, List.copyOf(sameNamespaceTracks), () -> this.trackSelectionList.setTracks(this.tracks))
         );
     }

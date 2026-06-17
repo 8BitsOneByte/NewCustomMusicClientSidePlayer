@@ -42,7 +42,7 @@ public final class CCustomNowPlayingToast implements Toast {
     }
 
     public static void show(Minecraft client, Component title) {
-        ToastManager toastManager = client.getToastManager();
+        ToastManager toastManager = client.gui.toastManager();
         CCustomNowPlayingToast toast = toastManager.getToast(CCustomNowPlayingToast.class, TOKEN);
         if (toast == null) {
             toastManager.addToast(new CCustomNowPlayingToast(title));

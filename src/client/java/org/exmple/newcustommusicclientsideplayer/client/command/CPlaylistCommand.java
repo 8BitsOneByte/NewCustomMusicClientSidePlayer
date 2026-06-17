@@ -293,9 +293,9 @@ public final class CPlaylistCommand {
 
         Minecraft client = source.getClient();
         client.execute(
-                () -> client.setScreen(
+                () -> client.gui.setScreen(
                         new CPlaylistTestScreen(
-                                client.screen,
+                                client.gui.screen(),
                                 normalizedName,
                                 initialPlaylist,
                                 updatedPlaylist -> CPlaylistRepository.savePlaylist(normalizedName, updatedPlaylist)

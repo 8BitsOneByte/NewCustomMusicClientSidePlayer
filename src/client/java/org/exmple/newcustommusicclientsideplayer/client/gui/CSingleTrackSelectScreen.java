@@ -106,7 +106,7 @@ public final class CSingleTrackSelectScreen extends Screen {
 
     @Override
     public void onClose() {
-        this.minecraft.setScreen(this.parent);
+        this.minecraft.gui.setScreen(this.parent);
     }
 
     @Override
@@ -218,9 +218,9 @@ public final class CSingleTrackSelectScreen extends Screen {
             return;
         }
 
-        this.minecraft.setScreen(
+        this.minecraft.gui.setScreen(
             new CSingleTrackPlayConfirmScreen(this, selected, (loop, pitch) -> {
-                this.minecraft.setScreen(null);
+                this.minecraft.gui.setScreen(null);
                 CPlaySoundController.playFromUi(this.minecraft, selected, loop, pitch);
             })
         );
@@ -235,7 +235,7 @@ public final class CSingleTrackSelectScreen extends Screen {
         List<Identifier> sameNamespaceTracks = this.allSounds.stream()
             .filter(id -> id.getNamespace().equals(selected.getNamespace()))
             .toList();
-        this.minecraft.setScreen(new CRenameTrackScreen(this, selected, sameNamespaceTracks, this::refreshVisibleEntries));
+        this.minecraft.gui.setScreen(new CRenameTrackScreen(this, selected, sameNamespaceTracks, this::refreshVisibleEntries));
     }
 
     private void playUiClickSound() {
@@ -325,7 +325,7 @@ public final class CSingleTrackSelectScreen extends Screen {
                 guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, CSingleTrackSelectScreen.getDisplayName(this.id)), textX, this.getContentY() + 1, COLOR_TEXT_WHITE, false);
                 guiGraphics.text(font, buildDescription(this.id), textX, this.getContentY() + 12, COLOR_TEXT_GRAY, false);
 
-                boolean showHoverOverlay = this.list.minecraft.options.touchscreen().get() || hovered || this.list.getSelected() == this && this.list.isFocused();
+                boolean showHoverOverlay = !this.list.minecraft.getLastInputType().isMouse() || hovered || this.list.getSelected() == this && this.list.isFocused();
                 if (showHoverOverlay) {
                     guiGraphics.fill(this.getContentX(), this.getContentY(), this.getContentX() + 32, this.getContentY() + 32, -1601138544);
                 }

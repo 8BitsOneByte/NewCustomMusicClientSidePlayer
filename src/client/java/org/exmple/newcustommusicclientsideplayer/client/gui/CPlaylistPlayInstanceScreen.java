@@ -195,7 +195,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
 
     @Override
     public void onClose() {
-        this.minecraft.setScreen(this.parent);
+        this.minecraft.gui.setScreen(this.parent);
     }
 
     @Override
@@ -335,7 +335,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
         }
 
         if (this.onStart.start(this.loopEnabled, this.shuffleEnabled, startIndex) > 0) {
-            this.minecraft.setScreen(null);
+            this.minecraft.gui.setScreen(null);
         }
     }
 

@@ -149,7 +149,7 @@ public class CPlaylistTestScreen extends Screen {
 
     @Override
     public void onClose() {
-        this.minecraft.setScreen(this.parent);
+        this.minecraft.gui.setScreen(this.parent);
     }
 
     private void onDoneClicked() {
@@ -158,7 +158,7 @@ public class CPlaylistTestScreen extends Screen {
         }
 
         if (!this.hasPlaylistChanged()) {
-            this.minecraft.setScreen(this.parent);
+            this.minecraft.gui.setScreen(this.parent);
             return;
         }
 
@@ -172,13 +172,13 @@ public class CPlaylistTestScreen extends Screen {
         }).whenComplete((unused, throwable) -> this.minecraft.execute(() -> {
             if (throwable != null && this.minecraft.player != null) {
                 this.minecraft.player.sendSystemMessage(Component.translatable("screen.custommusicclientsideplayer.error.save_playlist_failed"));
-                this.minecraft.setScreen(this.parent);
+                this.minecraft.gui.setScreen(this.parent);
                 return;
             }
 
             this.minecraft.reloadResourcePacks().whenComplete((ignored, reloadThrowable) -> this.minecraft.execute(() -> {
                 this.onSavedSuccess.run();
-                this.minecraft.setScreen(this.parent);
+                this.minecraft.gui.setScreen(this.parent);
             }));
         }));
     }
@@ -192,7 +192,7 @@ public class CPlaylistTestScreen extends Screen {
             return;
         }
 
-        this.minecraft.setScreen(new CRenamePlaylistScreen(this, this.playlistName, this::onRenameConfirmed));
+        this.minecraft.gui.setScreen(new CRenamePlaylistScreen(this, this.playlistName, this::onRenameConfirmed));
     }
 
     private void onRenameConfirmed(String newPlaylistName) {
@@ -216,13 +216,13 @@ public class CPlaylistTestScreen extends Screen {
                     this.minecraft.player.sendSystemMessage(Component.translatable("screen.custommusicclientsideplayer.error.rename_playlist_failed"));
                 }
 
-                this.minecraft.setScreen(this);
+                this.minecraft.gui.setScreen(this);
                 return;
             }
 
             this.minecraft.reloadResourcePacks().whenComplete((ignored, reloadThrowable) -> this.minecraft.execute(() -> {
                 this.onSavedSuccess.run();
-                this.minecraft.setScreen(this.parent);
+                this.minecraft.gui.setScreen(this.parent);
             }));
         }));
     }
@@ -478,7 +478,7 @@ public class CPlaylistTestScreen extends Screen {
                     }
                 }
 
-                boolean showHoverOverlay = this.list.minecraft.options.touchscreen().get() || hovered || this.list.getSelected() == this && this.list.isFocused();
+                boolean showHoverOverlay = !this.list.minecraft.getLastInputType().isMouse() || hovered || this.list.getSelected() == this && this.list.isFocused();
                 if (showHoverOverlay) {
                     guiGraphics.fill(this.getContentX(), this.getContentY(), this.getContentX() + 32, this.getContentY() + 32, -1601138544);
                     int localX = mouseX - this.getContentX();

@@ -146,7 +146,7 @@ public class CPlaylistConfigScreen extends Screen {
 
     @Override
     public void onClose() {
-        this.minecraft.setScreen(this.parent);
+        this.minecraft.gui.setScreen(this.parent);
     }
 
     private void reloadEntries() {
@@ -226,7 +226,7 @@ public class CPlaylistConfigScreen extends Screen {
             return;
         }
 
-        this.minecraft.setScreen(
+        this.minecraft.gui.setScreen(
             new CPlaylistPlayInstanceScreen(
                 this,
                 playlistName,
@@ -258,7 +258,7 @@ public class CPlaylistConfigScreen extends Screen {
             return;
         }
 
-        this.minecraft.setScreen(
+        this.minecraft.gui.setScreen(
             new CPlaylistTestScreen(
                 this,
                 playlistName,
@@ -283,7 +283,7 @@ public class CPlaylistConfigScreen extends Screen {
             .append(Component.translatable("screen.custommusicclientsideplayer.config_playlists.confirm_delete_line2"));
         ConfirmScreen confirmScreen = new ConfirmScreen(
             shouldDelete -> {
-                this.minecraft.setScreen(this);
+                this.minecraft.gui.setScreen(this);
                 if (shouldDelete) {
                     this.deleteSelectedPlaylist(playlistName);
                 }
@@ -295,10 +295,10 @@ public class CPlaylistConfigScreen extends Screen {
         ) {
             @Override
             public void onClose() {
-                CPlaylistConfigScreen.this.minecraft.setScreen(CPlaylistConfigScreen.this);
+                CPlaylistConfigScreen.this.minecraft.gui.setScreen(CPlaylistConfigScreen.this);
             }
         };
-        this.minecraft.setScreen(confirmScreen);
+        this.minecraft.gui.setScreen(confirmScreen);
     }
 
     private void deleteSelectedPlaylist(String playlistName) {
@@ -327,7 +327,7 @@ public class CPlaylistConfigScreen extends Screen {
             return;
         }
 
-        this.minecraft.setScreen(new CCreatePlaylistScreen(this, this::reloadEntries));
+        this.minecraft.gui.setScreen(new CCreatePlaylistScreen(this, this::reloadEntries));
     }
 
     private void onRecreateSelected() {
@@ -343,7 +343,7 @@ public class CPlaylistConfigScreen extends Screen {
             .append(Component.translatable("screen.custommusicclientsideplayer.config_playlists.confirm_recreate_line2"));
         ConfirmScreen confirmScreen = new ConfirmScreen(
             shouldRecreate -> {
-                this.minecraft.setScreen(this);
+                this.minecraft.gui.setScreen(this);
                 if (shouldRecreate) {
                     this.recreateSelectedPlaylist(playlistName);
                 }
@@ -355,10 +355,10 @@ public class CPlaylistConfigScreen extends Screen {
         ) {
             @Override
             public void onClose() {
-                CPlaylistConfigScreen.this.minecraft.setScreen(CPlaylistConfigScreen.this);
+                CPlaylistConfigScreen.this.minecraft.gui.setScreen(CPlaylistConfigScreen.this);
             }
         };
-        this.minecraft.setScreen(confirmScreen);
+        this.minecraft.gui.setScreen(confirmScreen);
     }
 
     private void recreateSelectedPlaylist(String playlistName) {
@@ -387,7 +387,7 @@ public class CPlaylistConfigScreen extends Screen {
             return;
         }
 
-        this.minecraft.setScreen(new CPlaylistTracksViewScreen(this, playlistName, tracks));
+        this.minecraft.gui.setScreen(new CPlaylistTracksViewScreen(this, playlistName, tracks));
     }
 
     private boolean canMovePlaylistUp(String playlistName) {
@@ -526,7 +526,7 @@ public class CPlaylistConfigScreen extends Screen {
                 guiGraphics.text(font, this.summary.name(), textX, this.getContentY() + 1, 0xFFFFFFFF, false);
                 guiGraphics.text(font, buildDescription(this.summary), textX, this.getContentY() + 12, 0xFF808080, false);
 
-                boolean showOverlay = this.screen.minecraft.options.touchscreen().get() || hovered;
+                boolean showOverlay = !this.screen.minecraft.getLastInputType().isMouse() || hovered;
                 if (showOverlay) {
                     guiGraphics.fill(this.getContentX(), this.getContentY(), this.getContentX() + ICON_SIZE, this.getContentY() + ICON_SIZE, 0xA0000000);
 
