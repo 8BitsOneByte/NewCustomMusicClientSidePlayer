@@ -4,9 +4,15 @@
   "version": "${version}",
 
   "name": "NewCustomMusicClientSidePlayer",
-  "description": "",
-  "authors": [],
-  "contact": {},
+  "description": "A client-side Minecraft music player for custom music from resource packs.",
+  "authors": [
+    "8BitsOneByte"
+  ],
+  "contact": {
+    "homepage": "https://modrinth.com/mod/new-custom-music-client-side-player" ,
+    "sources": "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/tree/master",
+    "issues": "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/issues"
+  },
 
   "license": "MIT",
   "icon": "assets/newcustommusicclientsideplayer/icon.png",
