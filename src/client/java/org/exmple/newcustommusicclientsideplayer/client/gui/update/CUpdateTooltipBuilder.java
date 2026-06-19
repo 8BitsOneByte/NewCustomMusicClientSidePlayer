@@ -49,12 +49,7 @@ public final class CUpdateTooltipBuilder {
     }
 
     private static String changelogLine(CUpdateStatus status) {
-        String changelog = status.changelogPreview();
-        if (changelog.length() >= CUpdatePolicy.CHANGELOG_PREVIEW_LIMIT) {
-            return changelog + "...";
-        }
-
-        return changelog;
+        return status.changelogPreview();
     }
 
     private static String formatPublishedAt(String publishedAt) {

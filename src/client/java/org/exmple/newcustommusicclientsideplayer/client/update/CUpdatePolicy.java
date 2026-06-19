@@ -57,6 +57,6 @@ public final class CUpdatePolicy {
             return trimmed;
         }
 
-        return trimmed.substring(0, CHANGELOG_PREVIEW_LIMIT).trim();
+        return trimmed.substring(0, CHANGELOG_PREVIEW_LIMIT - 3).trim() + "...";
     }
 }
