@@ -49,6 +49,22 @@ public final class CUpdateCache {
         write(data);
     }
 
+    /**
+     * Replaces any cached check result with the disabled state and clears all scheduling metadata.
+     * Disabled is not a successful check, so retaining a previous success timestamp or retry deadline
+     * could incorrectly prevent an immediate check when the user enables update checks again.
+     */
+    public void saveDisabled(CUpdateEnvironment environment) {
+        CacheData data = CacheData.fromSnapshot(environment, new Snapshot(
+            CUpdateStatus.disabled(environment),
+            0L,
+            0L,
+            0L,
+            0
+        ));
+        write(data);
+    }
+
     public void saveFailure(CUpdateEnvironment environment, Snapshot previousSnapshot, long nowEpochMillis) {
         Snapshot previous = previousSnapshot == null ? Snapshot.empty(environment) : previousSnapshot;
         int consecutiveFailures = previous.consecutiveFailures() + 1;
@@ -165,6 +181,10 @@ public final class CUpdateCache {
 
         private Snapshot toSnapshot(CUpdateEnvironment environment) {
             CUpdateState parsedState = parseState(this.state);
+            if (parsedState == CUpdateState.DISABLED) {
+                return new Snapshot(CUpdateStatus.disabled(environment), 0L, 0L, 0L, 0);
+            }
+
             CUpdateStatus status = switch (parsedState) {
                 case UP_TO_DATE -> CUpdateStatus.upToDate(environment, this.checkedAtEpochMillis);
                 case UPDATE_AVAILABLE -> CUpdateStatus.updateAvailable(
@@ -177,6 +197,7 @@ public final class CUpdateCache {
                 );
                 case CHECK_FAILED -> CUpdateStatus.checkFailed(environment, this.checkedAtEpochMillis);
                 case UNKNOWN -> CUpdateStatus.unknown(environment);
+                case DISABLED -> throw new IllegalStateException("Disabled state must be handled before cache metadata");
             };
 
             return new Snapshot(

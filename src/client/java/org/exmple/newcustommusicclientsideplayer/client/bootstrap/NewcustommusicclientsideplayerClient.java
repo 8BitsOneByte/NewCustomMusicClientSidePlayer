@@ -15,6 +15,8 @@ import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import org.lwjgl.glfw.GLFW;
+import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
+import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigRepository;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaybackVolumeSettings;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPauseCommand;
@@ -140,7 +142,8 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
                 }
         );
 
-        CUpdateChecker.initialize();
+        CModConfig modConfig = new CModConfigRepository().load();
+        CUpdateChecker.initialize(modConfig.checkForUpdates());
     }
 
     private static void showVolumeAdjustFeedback(Minecraft client, CPlaySoundController.VolumeAdjustResult result) {

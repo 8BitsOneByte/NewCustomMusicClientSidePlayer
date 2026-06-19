@@ -49,6 +49,20 @@ public final class CUpdateStatus {
         );
     }
 
+    public static CUpdateStatus disabled(CUpdateEnvironment environment) {
+        return new CUpdateStatus(
+            CUpdateState.DISABLED,
+            "",
+            "",
+            "",
+            "",
+            0L,
+            environment.minecraftVersion(),
+            environment.currentModVersion(),
+            environment.loader()
+        );
+    }
+
     public static CUpdateStatus upToDate(CUpdateEnvironment environment, long checkedAtEpochMillis) {
         return new CUpdateStatus(
             CUpdateState.UP_TO_DATE,

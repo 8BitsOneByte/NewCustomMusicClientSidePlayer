@@ -1,19 +1,13 @@
 package org.exmple.newcustommusicclientsideplayer.client.gui;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.MultiLineTextWidget;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.layouts.GridLayout;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.locale.Language;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
@@ -23,14 +17,11 @@ import org.exmple.newcustommusicclientsideplayer.client.update.CUpdateChecker;
 import org.exmple.newcustommusicclientsideplayer.client.update.CUpdateStatus;
 
 public final class CMainConfigScreen extends Screen {
-    private static final String TIP_KEY_PREFIX = "screen.custommusicclientsideplayer.main_menu.tip.";
-    private static final int[] INITIAL_TIP_BLACKLIST = {5, 7, 8};
     private static final int SPACING = 8;
     private static final int BUTTON_WIDTH = 210;
-    private static final int HALF_BUTTON_WIDTH = 101;
     private static final int MODE_BUTTON_WIDTH = 150;
     private static final int LINK_BUTTON_WIDTH = MODE_BUTTON_WIDTH;
-    private static final int TIP_CONTROL_BUTTON_WIDTH = HALF_BUTTON_WIDTH;
+    private static final int MORE_BUTTON_WIDTH = MODE_BUTTON_WIDTH;
 
     private static final Component TITLE = Component.translatable("screen.custommusicclientsideplayer.main_menu.title");
     private static final Component MOD_NAME = Component.translatable("screen.custommusicclientsideplayer.main_menu.mod_name");
@@ -42,10 +33,12 @@ public final class CMainConfigScreen extends Screen {
     private static final Component REPORT_BUGS = Component.translatable("screen.custommusicclientsideplayer.main_menu.report_bugs");
     private static final Component MODRINTH = Component.translatable("screen.custommusicclientsideplayer.main_menu.modrinth");
     private static final Component GITHUB = Component.translatable("screen.custommusicclientsideplayer.main_menu.github");
-    private static final Component TIP_PREFIX = Component.translatable("screen.custommusicclientsideplayer.main_menu.tip_prefix").withStyle(ChatFormatting.GREEN);
-    private static final Component PREVIOUS_TIP = Component.translatable("screen.custommusicclientsideplayer.main_menu.previous_tip");
-    private static final Component RANDOM_TIP = Component.translatable("screen.custommusicclientsideplayer.main_menu.random_tip");
-    private static final Component NEXT_TIP = Component.translatable("screen.custommusicclientsideplayer.main_menu.next_tip");
+    private static final Component MORE =
+        Component.translatable("screen.custommusicclientsideplayer.main_menu.more");
+    private static final Component MOD_CONFIGS =
+        Component.translatable("screen.custommusicclientsideplayer.main_menu.mod_configs");
+    private static final Component TIPS_AND_TRICKS =
+        Component.translatable("screen.custommusicclientsideplayer.tips.title");
 
     private static final String SOURCE_URL = "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/tree/master";
     private static final String REPORT_BUGS_URL = "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/issues";
@@ -54,11 +47,8 @@ public final class CMainConfigScreen extends Screen {
 
     private final Screen parent;
     private HeaderAndFooterLayout layout;
-    private MultiLineTextWidget tipWidget;
     private Button modrinthButton;
     private CUpdateStatus updateStatus;
-    private List<Component> tips;
-    private int tipIndex;
 
     public CMainConfigScreen(Screen parent) {
         super(TITLE);
@@ -81,20 +71,21 @@ public final class CMainConfigScreen extends Screen {
         adder.addChild(Button.builder(SOURCE, ConfirmLinkScreen.confirmLink(this, SOURCE_URL)).width(LINK_BUTTON_WIDTH).build());
         adder.addChild(Button.builder(REPORT_BUGS, ConfirmLinkScreen.confirmLink(this, REPORT_BUGS_URL)).width(LINK_BUTTON_WIDTH).build());
         this.modrinthButton = Button.builder(MODRINTH, ConfirmLinkScreen.confirmLink(this, MODRINTH_URL)).width(LINK_BUTTON_WIDTH).build();
-        this.applyModrinthUpdateTooltip();
+        this.synchronizeModrinthUpdateDisplay();
         adder.addChild(this.modrinthButton);
         adder.addChild(Button.builder(GITHUB, ConfirmLinkScreen.confirmLink(this, GITHUB_URL)).width(LINK_BUTTON_WIDTH).build());
 
-        this.tips = this.loadTips();
-        this.tipIndex = this.pickInitialTipIndex();
-        adder.addChild(new StringWidget(TIP_PREFIX, this.font), 2);
-        this.tipWidget = adder.addChild(new MultiLineTextWidget(this.currentTip(), this.font).setCentered(true).setMaxWidth((int)(this.width * 0.85F)), 2);
-        GridLayout tipButtons = adder.addChild(new GridLayout().spacing(6), 2);
-        tipButtons.defaultCellSetting().alignHorizontallyCenter();
-        GridLayout.RowHelper tipButtonRow = tipButtons.createRowHelper(3);
-        tipButtonRow.addChild(Button.builder(PREVIOUS_TIP, button -> this.showPreviousTip()).width(TIP_CONTROL_BUTTON_WIDTH).build());
-        tipButtonRow.addChild(Button.builder(RANDOM_TIP, button -> this.rollRandomTip()).width(TIP_CONTROL_BUTTON_WIDTH).build());
-        tipButtonRow.addChild(Button.builder(NEXT_TIP, button -> this.showNextTip()).width(TIP_CONTROL_BUTTON_WIDTH).build());
+        adder.addChild(new StringWidget(MORE, this.font), 2);
+        adder.addChild(
+            Button.builder(MOD_CONFIGS, button -> this.openModConfigScreen())
+                .width(MORE_BUTTON_WIDTH)
+                .build()
+        );
+        adder.addChild(
+            Button.builder(TIPS_AND_TRICKS, button -> this.openTipsScreen())
+                .width(MORE_BUTTON_WIDTH)
+                .build()
+        );
         adder.addChild(Button.builder(CommonComponents.GUI_DONE, button -> this.onClose()).width(BUTTON_WIDTH).build(), 2);
 
         this.layout.arrangeElements();
@@ -116,8 +107,8 @@ public final class CMainConfigScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        this.synchronizeModrinthUpdateDisplay();
         super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
-        this.refreshModrinthUpdateStatus();
         CUpdateBadgeRenderer.render(guiGraphics, this.modrinthButton, this.updateStatus);
     }
 
@@ -133,107 +124,37 @@ public final class CMainConfigScreen extends Screen {
         }
     }
 
-    private void applyModrinthUpdateTooltip() {
-        this.refreshModrinthUpdateStatus();
-        if (this.updateStatus.updateAvailable()) {
-            this.modrinthButton.setTooltip(CUpdateTooltipBuilder.build(this.updateStatus));
+    private void openModConfigScreen() {
+        if (this.minecraft != null) {
+            this.minecraft.gui.setScreen(new CModConfigScreen(this));
         }
     }
 
-    private void refreshModrinthUpdateStatus() {
-        this.updateStatus = CUpdateChecker.getStatus();
-    }
-
-    private void rollRandomTip() {
-        if (this.tips.size() > 1) {
-            int nextIndex = this.tipIndex;
-            while (nextIndex == this.tipIndex) {
-                nextIndex = ThreadLocalRandom.current().nextInt(this.tips.size());
-            }
-            this.tipIndex = nextIndex;
-        } else if (this.tips.size() == 1) {
-            this.tipIndex = 0;
+    private void openTipsScreen() {
+        if (this.minecraft != null) {
+            this.minecraft.gui.setScreen(new CTipsScreen(this));
         }
-        this.tipWidget.setMessage(this.currentTip());
-        this.layout.arrangeElements();
     }
 
-    private void showPreviousTip() {
-        if (this.tips.isEmpty()) {
-            this.tipWidget.setMessage(Component.literal(" "));
-            this.layout.arrangeElements();
+    /**
+     * Synchronizes the button before its render state is extracted so an asynchronous checker result,
+     * or an Apply action that disables checks, affects the badge and tooltip in the same frame. Status
+     * instances are immutable and replaced on transitions, so the tooltip is rebuilt only when the
+     * checker publishes a different instance.
+     */
+    private void synchronizeModrinthUpdateDisplay() {
+        CUpdateStatus currentStatus = CUpdateChecker.getStatus();
+        if (currentStatus == this.updateStatus) {
             return;
         }
 
-        this.tipIndex = Math.floorMod(this.tipIndex - 1, this.tips.size());
-        this.tipWidget.setMessage(this.currentTip());
-        this.layout.arrangeElements();
-    }
-
-    private void showNextTip() {
-        if (this.tips.isEmpty()) {
-            this.tipWidget.setMessage(Component.literal(" "));
-            this.layout.arrangeElements();
-            return;
+        this.updateStatus = currentStatus;
+        switch (currentStatus.state()) {
+            case UPDATE_AVAILABLE ->
+                this.modrinthButton.setTooltip(CUpdateTooltipBuilder.build(currentStatus));
+            case UP_TO_DATE, DISABLED, UNKNOWN, CHECK_FAILED ->
+                this.modrinthButton.setTooltip(null);
         }
-
-        this.tipIndex = Math.floorMod(this.tipIndex + 1, this.tips.size());
-        this.tipWidget.setMessage(this.currentTip());
-        this.layout.arrangeElements();
-    }
-
-    private Component currentTip() {
-        if (this.tips.isEmpty()) {
-            return Component.literal(" ");
-        }
-
-        return this.tips.get(this.tipIndex);
-    }
-
-    private List<Component> loadTips() {
-        List<Component> loaded = new ArrayList<>();
-        Language language = Language.getInstance();
-        for (int i = 1; ; i++) {
-            String key = TIP_KEY_PREFIX + i;
-            if (!language.has(key)) {
-                break;
-            }
-
-            loaded.add(Component.translatable(key));
-        }
-        if (loaded.isEmpty()) {
-            loaded.add(Component.literal(" "));
-        }
-
-        return loaded;
-    }
-
-    private int pickInitialTipIndex() {
-        if (this.tips.isEmpty()) {
-            return 0;
-        }
-
-        List<Integer> allowed = new ArrayList<>();
-        for (int i = 0; i < this.tips.size(); i++) {
-            int tipNumber = i + 1;
-            boolean blacklisted = false;
-            for (int forbidden : INITIAL_TIP_BLACKLIST) {
-                if (forbidden == tipNumber) {
-                    blacklisted = true;
-                    break;
-                }
-            }
-
-            if (!blacklisted) {
-                allowed.add(i);
-            }
-        }
-
-        if (allowed.isEmpty()) {
-            return ThreadLocalRandom.current().nextInt(this.tips.size());
-        }
-
-        return allowed.get(ThreadLocalRandom.current().nextInt(allowed.size()));
     }
 
     private Component modNameWithVersion() {

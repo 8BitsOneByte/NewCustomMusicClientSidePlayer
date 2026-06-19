@@ -9,7 +9,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.fabricmc.loader.api.FabricLoader;
 
 public final class CUpdateChecker {
@@ -20,79 +19,179 @@ public final class CUpdateChecker {
     private static final String CACHE_FILE_NAME = "update_cache.json";
 
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(new UpdateThreadFactory());
-    private static final AtomicBoolean CHECK_RUNNING = new AtomicBoolean(false);
+    private static final Object STATE_LOCK = new Object();
 
     private static volatile CUpdateEnvironment environment;
     private static volatile CUpdateStatus status;
+    private static boolean checkForUpdatesEnabled = true;
+    private static long checkGeneration;
 
     private CUpdateChecker() {
     }
 
     public static void initialize() {
-        CUpdateEnvironment createdEnvironment = createEnvironment();
-        environment = createdEnvironment;
+        initialize(true);
+    }
 
-        CUpdateCache cache = CUpdateCache.forEnvironment(createdEnvironment);
-        CUpdateCache.Snapshot snapshot = cache.load(createdEnvironment);
-        status = snapshot.status();
+    public static void initialize(boolean enabled) {
+        applyCheckForUpdates(enabled, true);
+    }
 
-        long now = System.currentTimeMillis();
-        if (snapshot.hasFreshSuccessfulStatus(createdEnvironment, now) || !snapshot.canAttempt(now)) {
-            return;
+    /**
+     * Applies a persisted update-check preference to the live checker. Callers should invoke this only
+     * after an Apply operation has saved the selected value, not while a configuration draft is changing.
+     *
+     * <p>Every application advances the request generation. An asynchronous request may publish its result
+     * only while update checks remain enabled and its captured generation is still current. Cache writes and
+     * in-memory status updates share the same lock as preference changes, so a request that predates OFF, or
+     * predates a later OFF-to-ON cycle, cannot overwrite the state or cache selected by the newer generation.</p>
+     */
+    public static void applyCheckForUpdates(boolean enabled) {
+        applyCheckForUpdates(enabled, false);
+    }
+
+    private static void applyCheckForUpdates(boolean enabled, boolean honorRetrySchedule) {
+        synchronized (STATE_LOCK) {
+            CUpdateEnvironment currentEnvironment = environment;
+            if (currentEnvironment == null) {
+                currentEnvironment = createEnvironment();
+                environment = currentEnvironment;
+            }
+
+            checkForUpdatesEnabled = enabled;
+            long generation = ++checkGeneration;
+            CUpdateCache cache = CUpdateCache.forEnvironment(currentEnvironment);
+            if (!enabled) {
+                status = CUpdateStatus.disabled(currentEnvironment);
+                cache.saveDisabled(currentEnvironment);
+                return;
+            }
+
+            CUpdateCache.Snapshot snapshot = enabledSnapshot(cache.load(currentEnvironment), currentEnvironment);
+            status = snapshot.status();
+
+            long now = System.currentTimeMillis();
+            if (snapshot.hasFreshSuccessfulStatus(currentEnvironment, now)
+                || (honorRetrySchedule && !snapshot.canAttempt(now))) {
+                return;
+            }
+
+            startAsyncCheck(currentEnvironment, cache, snapshot, generation);
         }
-
-        startAsyncCheck(createdEnvironment, cache, snapshot);
     }
 
     public static CUpdateStatus getStatus() {
         CUpdateStatus current = status;
-        CUpdateEnvironment currentEnvironment = environment;
         if (current != null) {
             return current;
         }
-        if (currentEnvironment != null) {
-            return CUpdateStatus.unknown(currentEnvironment);
-        }
 
-        CUpdateEnvironment createdEnvironment = createEnvironment();
-        environment = createdEnvironment;
-        CUpdateStatus unknown = CUpdateStatus.unknown(createdEnvironment);
-        status = unknown;
-        return unknown;
+        synchronized (STATE_LOCK) {
+            if (status != null) {
+                return status;
+            }
+
+            CUpdateEnvironment currentEnvironment = environment;
+            if (currentEnvironment == null) {
+                currentEnvironment = createEnvironment();
+                environment = currentEnvironment;
+            }
+
+            status = checkForUpdatesEnabled
+                ? CUpdateStatus.unknown(currentEnvironment)
+                : CUpdateStatus.disabled(currentEnvironment);
+            return status;
+        }
     }
 
     private static void startAsyncCheck(
         CUpdateEnvironment currentEnvironment,
         CUpdateCache cache,
-        CUpdateCache.Snapshot snapshot
+        CUpdateCache.Snapshot snapshot,
+        long generation
     ) {
-        if (!CHECK_RUNNING.compareAndSet(false, true)) {
+        CompletableFuture.runAsync(
+            () -> checkNow(currentEnvironment, cache, snapshot, generation),
+            EXECUTOR
+        );
+    }
+
+    private static void checkNow(
+        CUpdateEnvironment currentEnvironment,
+        CUpdateCache cache,
+        CUpdateCache.Snapshot snapshot,
+        long generation
+    ) {
+        if (!canRunCheck(currentEnvironment, generation)) {
             return;
         }
 
-        CompletableFuture.runAsync(() -> {
-            try {
-                checkNow(currentEnvironment, cache, snapshot);
-            } finally {
-                CHECK_RUNNING.set(false);
-            }
-        }, EXECUTOR);
-    }
-
-    private static void checkNow(CUpdateEnvironment currentEnvironment, CUpdateCache cache, CUpdateCache.Snapshot snapshot) {
         long now = System.currentTimeMillis();
         Optional<List<CModrinthVersion>> fetchedVersions = new CModrinthUpdateClient().fetchProjectVersions(currentEnvironment);
         if (fetchedVersions.isEmpty()) {
-            cache.saveFailure(currentEnvironment, snapshot, now);
-            CUpdateCache.Snapshot updatedSnapshot = cache.load(currentEnvironment);
-            status = updatedSnapshot.status();
+            commitFailure(currentEnvironment, cache, snapshot, now, generation);
             return;
         }
 
         CUpdateStatus checkedStatus = selectLatestUpdate(currentEnvironment, fetchedVersions.get(), now)
             .orElseGet(() -> CUpdateStatus.upToDate(currentEnvironment, now));
-        status = checkedStatus;
-        cache.saveSuccess(currentEnvironment, checkedStatus, now);
+        commitSuccess(currentEnvironment, cache, checkedStatus, now, generation);
+    }
+
+    private static boolean canRunCheck(CUpdateEnvironment currentEnvironment, long generation) {
+        synchronized (STATE_LOCK) {
+            return isCurrentGeneration(currentEnvironment, generation);
+        }
+    }
+
+    private static void commitFailure(
+        CUpdateEnvironment currentEnvironment,
+        CUpdateCache cache,
+        CUpdateCache.Snapshot snapshot,
+        long now,
+        long generation
+    ) {
+        synchronized (STATE_LOCK) {
+            if (!isCurrentGeneration(currentEnvironment, generation)) {
+                return;
+            }
+
+            cache.saveFailure(currentEnvironment, snapshot, now);
+            status = enabledSnapshot(cache.load(currentEnvironment), currentEnvironment).status();
+        }
+    }
+
+    private static void commitSuccess(
+        CUpdateEnvironment currentEnvironment,
+        CUpdateCache cache,
+        CUpdateStatus checkedStatus,
+        long now,
+        long generation
+    ) {
+        synchronized (STATE_LOCK) {
+            if (!isCurrentGeneration(currentEnvironment, generation)) {
+                return;
+            }
+
+            cache.saveSuccess(currentEnvironment, checkedStatus, now);
+            status = checkedStatus;
+        }
+    }
+
+    private static boolean isCurrentGeneration(CUpdateEnvironment currentEnvironment, long generation) {
+        return checkForUpdatesEnabled
+            && checkGeneration == generation
+            && environment == currentEnvironment;
+    }
+
+    private static CUpdateCache.Snapshot enabledSnapshot(
+        CUpdateCache.Snapshot snapshot,
+        CUpdateEnvironment currentEnvironment
+    ) {
+        if (snapshot.status().state() == CUpdateState.DISABLED) {
+            return CUpdateCache.Snapshot.empty(currentEnvironment);
+        }
+        return snapshot;
     }
 
     private static Optional<CUpdateStatus> selectLatestUpdate(

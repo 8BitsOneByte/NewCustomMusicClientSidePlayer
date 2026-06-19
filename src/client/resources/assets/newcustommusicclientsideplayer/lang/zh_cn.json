@@ -155,7 +155,8 @@
   "screen.custommusicclientsideplayer.main_menu.report_bugs": "报告漏洞",
   "screen.custommusicclientsideplayer.main_menu.modrinth": "Modrinth",
   "screen.custommusicclientsideplayer.main_menu.github": "Github",
-  "screen.custommusicclientsideplayer.main_menu.tip_prefix": "提示:",
+  "screen.custommusicclientsideplayer.main_menu.more": "更多",
+  "screen.custommusicclientsideplayer.main_menu.mod_configs": "模组配置",
   "screen.custommusicclientsideplayer.main_menu.previous_tip": "上一条",
   "screen.custommusicclientsideplayer.main_menu.random_tip": "随机提示",
   "screen.custommusicclientsideplayer.main_menu.next_tip": "下一条",
@@ -167,6 +168,14 @@
   "screen.custommusicclientsideplayer.main_menu.tip.6":"/cstopsound和/stopsong具有相同的功能.",
   "screen.custommusicclientsideplayer.main_menu.tip.7":"当来自资源包的曲目被添加进播放列表且该资源包被移除时，这些曲目将被跳过，你可以重新添加资源包使得这些曲目可以正常播放.",
   "screen.custommusicclientsideplayer.main_menu.tip.8":"在播放列表模式下：\n/skip n：跳过n首曲目\n/skip -n: 回退n首曲目\n/skip 0：重新播放当前曲目\nloop=true：使用环形索引；loop=false：不能越过首尾。",
+
+  "screen.custommusicclientsideplayer.mod_config.title": "模组配置",
+  "screen.custommusicclientsideplayer.mod_config.check_for_updates": "自动检查更新",
+  "screen.custommusicclientsideplayer.mod_config.apply": "应用",
+  "screen.custommusicclientsideplayer.mod_config.save_failed": "保存配置失败。",
+  "screen.custommusicclientsideplayer.mod_config.done_unsaved_changes": "有未保存的更改，请先应用更改。",
+
+  "screen.custommusicclientsideplayer.tips.title": "提示与技巧",
 
   "screen.custommusicclientsideplayer.update.available": "有可用新版本！",
   "screen.custommusicclientsideplayer.update.latest_version": "最新版本: %s",
