@@ -15,6 +15,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
@@ -25,6 +26,9 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
+import org.exmple.newcustommusicclientsideplayer.client.gui.component.CDropdownGeometry.ExpansionDirection;
+import org.exmple.newcustommusicclientsideplayer.client.gui.component.CDropdownScreenCoordinator;
+import org.exmple.newcustommusicclientsideplayer.client.gui.component.CDropdownSelector;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistRepository;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
@@ -32,6 +36,9 @@ import org.exmple.newcustommusicclientsideplayer.client.bootstrap.Newcustommusic
 
 public class CPlaylistTestScreen extends Screen {
     private static final int LIST_WIDTH = 200;
+    private static final int NAMESPACE_SELECTOR_WIDTH = 120;
+    private static final int NAMESPACE_SELECTOR_HEIGHT = 20;
+    private static final int MAX_VISIBLE_NAMESPACES = 6;
     private static final int COLOR_TEXT_WHITE = -1;
     private static final int COLOR_TEXT_GRAY = -8355712;
     private static final int COLOR_INCOMPATIBLE_ROW = -8978432;
@@ -56,13 +63,15 @@ public class CPlaylistTestScreen extends Screen {
     private final String playlistName;
     private final List<Identifier> initialPlaylistSnapshot;
     private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this);
+    private final CDropdownScreenCoordinator dropdownCoordinator =
+        new CDropdownScreenCoordinator();
     private List<Identifier> allSounds = List.of();
     private List<String> namespaces = List.of("minecraft");
     private final List<Identifier> playlist = new ArrayList<>();
     private int namespaceIndex = 0;
     private String availableFilter = "";
     private EditBox searchBox;
-    private Button nextNamespaceButton;
+    private CDropdownSelector<String> namespaceSelector;
     private Button renamePlaylistButton;
     private IdentifierSelectionList availableSoundList;
     private IdentifierSelectionList playlistSoundList;
@@ -94,6 +103,8 @@ public class CPlaylistTestScreen extends Screen {
 
     @Override
     protected void init() {
+        this.dropdownCoordinator.resetForRebuild();
+        this.layout.removeChildren();
         this.layout.setHeaderHeight(36);
         LinearLayout header = this.layout.addToHeader(LinearLayout.vertical().spacing(4));
         header.defaultCellSetting().alignHorizontallyCenter();
@@ -112,7 +123,23 @@ public class CPlaylistTestScreen extends Screen {
         );
 
         LinearLayout footer = this.layout.addToFooter(LinearLayout.horizontal().spacing(8));
-        this.nextNamespaceButton = footer.addChild(Button.builder(Component.translatable("screen.custommusicclientsideplayer.playlist_editor.next_namespace"), button -> this.nextNamespace()).width(120).build());
+        this.namespaceSelector = footer.addChild(
+            this.dropdownCoordinator.register(
+                new CDropdownSelector<>(
+                    0,
+                    0,
+                    NAMESPACE_SELECTOR_WIDTH,
+                    NAMESPACE_SELECTOR_HEIGHT,
+                    this.namespaces,
+                    this.getCurrentNamespace(),
+                    Component::literal,
+                    this::selectNamespace,
+                    ExpansionDirection.UP,
+                    NAMESPACE_SELECTOR_HEIGHT,
+                    MAX_VISIBLE_NAMESPACES
+                )
+            )
+        );
         this.renamePlaylistButton = footer.addChild(Button.builder(Component.translatable("screen.custommusicclientsideplayer.rename_playlist.title"), button -> this.openRenameScreen()).width(130).build());
         footer.addChild(Button.builder(CommonComponents.GUI_DONE, button -> this.onDoneClicked()).build());
 
@@ -149,7 +176,84 @@ public class CPlaylistTestScreen extends Screen {
 
     @Override
     public void onClose() {
+        this.dropdownCoordinator.closeAll();
         this.minecraft.gui.setScreen(this.parent);
+    }
+
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        boolean mouseCoveredByDropdown =
+            this.dropdownCoordinator.isMouseOverExpandedOverlay(mouseX, mouseY);
+        super.extractRenderState(
+            guiGraphics,
+            mouseCoveredByDropdown ? Integer.MIN_VALUE : mouseX,
+            mouseCoveredByDropdown ? Integer.MIN_VALUE : mouseY,
+            partialTick
+        );
+        this.dropdownCoordinator.extractOverlays(
+            guiGraphics,
+            mouseX,
+            mouseY,
+            partialTick
+        );
+    }
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        return this.dropdownCoordinator.mouseClicked(
+            event,
+            doubleClick,
+            this::clearFocus
+        )
+            || super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        return this.dropdownCoordinator.mouseReleased(event)
+            || super.mouseReleased(event);
+    }
+
+    @Override
+    public boolean mouseDragged(
+        MouseButtonEvent event,
+        double dragX,
+        double dragY
+    ) {
+        return this.dropdownCoordinator.mouseDragged(event, dragX, dragY)
+            || super.mouseDragged(event, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseScrolled(
+        double mouseX,
+        double mouseY,
+        double horizontalAmount,
+        double verticalAmount
+    ) {
+        return this.dropdownCoordinator.mouseScrolled(
+            mouseX,
+            mouseY,
+            horizontalAmount,
+            verticalAmount
+        ) || super.mouseScrolled(
+            mouseX,
+            mouseY,
+            horizontalAmount,
+            verticalAmount
+        );
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        return this.dropdownCoordinator.keyPressed(event)
+            || super.keyPressed(event);
+    }
+
+    @Override
+    public void removed() {
+        this.dropdownCoordinator.closeAll();
+        super.removed();
     }
 
     private void onDoneClicked() {
@@ -237,12 +341,20 @@ public class CPlaylistTestScreen extends Screen {
         this.allSounds = all.stream()
             .sorted(Comparator.comparing(Identifier::toString))
             .toList();
-        this.namespaces = this.allSounds.stream().map(Identifier::getNamespace).distinct().sorted().toList();
-        if (this.namespaces.isEmpty()) {
-            this.namespaces = List.of("minecraft");
-            this.namespaceIndex = 0;
-        } else if (this.namespaceIndex >= this.namespaces.size()) {
-            this.namespaceIndex = 0;
+        String previousNamespace = this.getCurrentNamespace();
+        List<String> availableNamespaces = this.allSounds.stream()
+            .map(Identifier::getNamespace)
+            .distinct()
+            .sorted()
+            .toList();
+        this.namespaces = availableNamespaces.isEmpty()
+            ? List.of("minecraft")
+            : availableNamespaces;
+        int previousIndex = this.namespaces.indexOf(previousNamespace);
+        this.namespaceIndex = previousIndex >= 0 ? previousIndex : 0;
+        if (this.namespaceSelector != null) {
+            this.namespaceSelector.replaceOptions(this.namespaces);
+            this.namespaceSelector.selectValue(this.getCurrentNamespace());
         }
 
         this.refreshAvailableList();
@@ -292,12 +404,13 @@ public class CPlaylistTestScreen extends Screen {
         return this.namespaces.get(this.namespaceIndex);
     }
 
-    private void nextNamespace() {
-        if (this.namespaces.isEmpty()) {
+    private void selectNamespace(String namespace) {
+        int selectedIndex = this.namespaces.indexOf(namespace);
+        if (selectedIndex < 0 || selectedIndex == this.namespaceIndex) {
             return;
         }
 
-        this.namespaceIndex = (this.namespaceIndex + 1) % this.namespaces.size();
+        this.namespaceIndex = selectedIndex;
         this.refreshAvailableList();
     }
 
@@ -404,6 +517,8 @@ public class CPlaylistTestScreen extends Screen {
         }
 
         private static final class HeaderEntry extends Entry {
+            private static final int HORIZONTAL_PADDING = 4;
+
             private final Font font;
             private final Component text;
 
@@ -412,9 +527,47 @@ public class CPlaylistTestScreen extends Screen {
                 this.text = text;
             }
 
+            /**
+             * Clips only the visual title to this list's content width. The
+             * original component remains unchanged for both the tooltip and
+             * narration, while the tooltip hit box follows the exact bounds of
+             * the centered text that is actually visible.
+             */
             @Override
             public void extractContent(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, boolean hovered, float delta) {
-                guiGraphics.centeredText(this.font, this.text, this.getX() + this.getWidth() / 2, this.getContentYMiddle() - this.font.lineHeight / 2, COLOR_TEXT_WHITE);
+                int textAreaLeft = this.getContentX() + HORIZONTAL_PADDING;
+                int textAreaRight = Math.max(
+                    textAreaLeft,
+                    this.getContentRight() - HORIZONTAL_PADDING
+                );
+                int availableWidth = textAreaRight - textAreaLeft;
+                boolean clipped = this.font.width(this.text) > availableWidth;
+                net.minecraft.util.FormattedCharSequence visibleText = clipped
+                    ? net.minecraft.client.gui.components.ComponentRenderUtils.clipText(
+                        this.text,
+                        this.font,
+                        availableWidth
+                    )
+                    : this.text.getVisualOrderText();
+                int visibleWidth = this.font.width(visibleText);
+                int textX = textAreaLeft + (availableWidth - visibleWidth) / 2;
+                int textY = this.getContentYMiddle() - this.font.lineHeight / 2;
+
+                guiGraphics.text(
+                    this.font,
+                    visibleText,
+                    textX,
+                    textY,
+                    COLOR_TEXT_WHITE,
+                    false
+                );
+                if (clipped
+                        && mouseX >= textX
+                        && mouseX < textX + visibleWidth
+                        && mouseY >= textY
+                        && mouseY < textY + this.font.lineHeight) {
+                    guiGraphics.setTooltipForNextFrame(this.text, mouseX, mouseY);
+                }
             }
 
             @Override

@@ -1,4 +1,7 @@
 {
+  "narration.newcustommusicclientsideplayer.dropdown.expanded": "已展开",
+  "narration.newcustommusicclientsideplayer.dropdown.collapsed": "已收起",
+
   "key.category.newcustommusicclientsideplayer.newcustom_music_client_side_player": "新版客户端自定义音乐播放器",
   "key.custommusicclientsideplayer.open_playlist_config": "打开模组菜单",
   "key.custommusicclientsideplayer.volume_up": "提高音量",
@@ -112,7 +115,6 @@
   "screen.newcustommusicclientsideplayer.play_instance.shuffle_requires_loop": "您需要打开循环模式才能使用随机播放。",
 
   "screen.custommusicclientsideplayer.singletrack.title": "选择要播放的曲目",
-  "screen.custommusicclientsideplayer.singletrack.namespace": "(命名空间: %s)",
   "screen.custommusicclientsideplayer.singletrack.play_selected": "播放选中的曲目",
   "screen.newcustommusicclientsideplayer.singletrack.pitch_label": "输入音高（若未指定则默认为1）",
   "screen.newcustommusicclientsideplayer.singletrack.pitch_hint": "输入音高...",
@@ -130,7 +132,6 @@
   "screen.custommusicclientsideplayer.playlist_editor.available_sounds": "可用声音",
   "screen.custommusicclientsideplayer.playlist_editor.available_sounds_with_namespace": "可用声音 [%s]",
   "screen.custommusicclientsideplayer.playlist_editor.playlist_header": "播放列表 [%s]",
-  "screen.custommusicclientsideplayer.playlist_editor.next_namespace": "下一命名空间",
   "screen.custommusicclientsideplayer.playlist_editor.empty": "(空)",
 
   "screen.custommusicclientsideplayer.view_tracks.title": "查看播放列表曲目",

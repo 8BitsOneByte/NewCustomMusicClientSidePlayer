@@ -5,20 +5,18 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.MultiLineTextWidget;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.components.StringWidget;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.gui.layouts.GridLayout;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.CommonComponents;
@@ -26,32 +24,49 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+import org.exmple.newcustommusicclientsideplayer.client.gui.component.CDropdownGeometry.ExpansionDirection;
+import org.exmple.newcustommusicclientsideplayer.client.gui.component.CDropdownScreenCoordinator;
+import org.exmple.newcustommusicclientsideplayer.client.gui.component.CDropdownSelector;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
 
 public final class CSingleTrackSelectScreen extends Screen {
     private static final int LIST_WIDTH = 200;
+    private static final int LIST_ROW_HEIGHT = 36;
+    private static final int LIST_TOP_PADDING = 2;
+    private static final int HEADER_ITEM_SPACING = 4;
+    private static final int HEADER_VERTICAL_PADDING = 4;
+    private static final int SEARCH_BOX_MIN_HEIGHT = 20;
+    private static final int SEARCH_BOX_MAX_HEIGHT = LIST_ROW_HEIGHT * 2 / 3;
+    private static final int NAMESPACE_SELECTOR_HEIGHT = 20;
+    private static final int MAX_VISIBLE_NAMESPACES = 6;
+    private static final int FOOTER_HEIGHT = 36;
     private static final int COLOR_TEXT_WHITE = -1;
     private static final int COLOR_TEXT_GRAY = -8355712;
     private static final int FOOTER_BUTTON_WIDTH = 120;
     private static final Component TITLE = Component.translatable("screen.custommusicclientsideplayer.singletrack.title");
     private static final Component SEARCH_HINT = Component.translatable("screen.custommusicclientsideplayer.playlist_editor.search_sound_id").withStyle(EditBox.SEARCH_HINT_STYLE);
-    private static final Component NEXT_NAMESPACE_TEXT = Component.translatable("screen.custommusicclientsideplayer.playlist_editor.next_namespace");
     private static final Component PLAY_SELECTED_TEXT = Component.translatable("screen.custommusicclientsideplayer.singletrack.play_selected");
     private static final Component RENAME_TRACK_TEXT = Component.translatable("screen.custommusicclientsideplayer.rename_track.button");
     private static final Identifier MC_MUS_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/mc_mus_icon.png");
     private static final Identifier OTHER_MUS_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/other_mus_icon.png");
 
     private final Screen parent;
-    private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this, 8 + 9 + 8 + 20 + 4, 54);
+    private final HeaderAndFooterLayout layout =
+        new HeaderAndFooterLayout(this, 0, FOOTER_HEIGHT);
+    private final CDropdownScreenCoordinator dropdownCoordinator =
+        new CDropdownScreenCoordinator();
     private final List<Identifier> allSounds = new ArrayList<>();
     private List<String> namespaces = List.of("minecraft");
     private int namespaceIndex;
 
     private SoundSelectionList soundSelectionList;
-    private MultiLineTextWidget namespaceWidget;
+    private CDropdownSelector<String> namespaceSelector;
+    private EditBox searchBox;
     private Button playSelectedTrackButton;
     private Button renameTrackButton;
+    private int searchBoxHeight = SEARCH_BOX_MIN_HEIGHT;
+    private boolean alignListToCompleteRows = true;
     private String filter = "";
 
     public CSingleTrackSelectScreen(Screen parent) {
@@ -61,28 +76,73 @@ public final class CSingleTrackSelectScreen extends Screen {
 
     @Override
     protected void init() {
-        LinearLayout header = this.layout.addToHeader(LinearLayout.vertical().spacing(4));
+        this.dropdownCoordinator.resetForRebuild();
+        this.layout.removeChildren();
+        this.updateHeaderMetrics();
+
+        LinearLayout header = this.layout.addToHeader(
+            LinearLayout.vertical().spacing(HEADER_ITEM_SPACING)
+        );
         header.defaultCellSetting().alignHorizontallyCenter();
         header.addChild(new StringWidget(this.title, this.font));
-        this.namespaceWidget = header.addChild(new MultiLineTextWidget(this.namespaceComponent(), this.font).setCentered(true).setMaxWidth((int)(this.width * 0.8F)));
-        EditBox searchBox = header.addChild(new EditBox(this.font, 0, 0, LIST_WIDTH, 15, Component.empty()));
-        searchBox.setHint(SEARCH_HINT);
-        searchBox.setValue(this.filter);
-        searchBox.setResponder(value -> {
+        this.namespaceSelector = header.addChild(
+            this.dropdownCoordinator.register(
+                new CDropdownSelector<>(
+                    0,
+                    0,
+                    LIST_WIDTH,
+                    NAMESPACE_SELECTOR_HEIGHT,
+                    this.namespaces,
+                    this.getCurrentNamespace(),
+                    Component::literal,
+                    this::selectNamespace,
+                    ExpansionDirection.DOWN,
+                    NAMESPACE_SELECTOR_HEIGHT,
+                    MAX_VISIBLE_NAMESPACES
+                )
+            )
+        );
+        this.searchBox = header.addChild(
+            new EditBox(
+                this.font,
+                0,
+                0,
+                LIST_WIDTH,
+                this.searchBoxHeight,
+                Component.empty()
+            )
+        );
+        this.searchBox.setHint(SEARCH_HINT);
+        this.searchBox.setValue(this.filter);
+        this.searchBox.setResponder(value -> {
             this.filter = value;
             this.refreshVisibleEntries();
         });
 
         this.soundSelectionList = this.layout.addToContents(new SoundSelectionList(this.minecraft, this, this.width, this.layout.getContentHeight()));
 
-        GridLayout footer = this.layout.addToFooter(new GridLayout().columnSpacing(8));
+        LinearLayout footer = this.layout.addToFooter(
+            LinearLayout.horizontal().spacing(8)
+        );
         footer.defaultCellSetting().alignHorizontallyCenter();
-        footer.rowSpacing(4);
-        GridLayout.RowHelper rowHelper = footer.createRowHelper(2);
-        rowHelper.addChild(Button.builder(NEXT_NAMESPACE_TEXT, ignoredButton -> this.nextNamespace()).width(FOOTER_BUTTON_WIDTH).build());
-        this.playSelectedTrackButton = rowHelper.addChild(Button.builder(PLAY_SELECTED_TEXT, ignoredButton -> this.onPlaySelectedTrack()).width(FOOTER_BUTTON_WIDTH).build());
-        this.renameTrackButton = rowHelper.addChild(Button.builder(RENAME_TRACK_TEXT, ignoredButton -> this.onRenameSelectedTrack()).width(FOOTER_BUTTON_WIDTH).build());
-        rowHelper.addChild(Button.builder(CommonComponents.GUI_BACK, ignoredButton -> this.onClose()).width(FOOTER_BUTTON_WIDTH).build());
+        this.playSelectedTrackButton = footer.addChild(
+            Button.builder(
+                PLAY_SELECTED_TEXT,
+                ignoredButton -> this.onPlaySelectedTrack()
+            ).width(FOOTER_BUTTON_WIDTH).build()
+        );
+        this.renameTrackButton = footer.addChild(
+            Button.builder(
+                RENAME_TRACK_TEXT,
+                ignoredButton -> this.onRenameSelectedTrack()
+            ).width(FOOTER_BUTTON_WIDTH).build()
+        );
+        footer.addChild(
+            Button.builder(
+                CommonComponents.GUI_BACK,
+                ignoredButton -> this.onClose()
+            ).width(FOOTER_BUTTON_WIDTH).build()
+        );
 
         this.layout.visitWidgets(this::addRenderableWidget);
         if (this.soundSelectionList != null) {
@@ -92,11 +152,12 @@ public final class CSingleTrackSelectScreen extends Screen {
         this.layout.arrangeElements();
         this.reloadSounds();
         this.updateButtonStates();
-        this.setInitialFocus(searchBox);
+        this.setInitialFocus(this.searchBox);
     }
 
     @Override
     protected void repositionElements() {
+        this.updateHeaderMetrics();
         if (this.soundSelectionList != null) {
             this.soundSelectionList.updateSize(this.width, this.layout);
         }
@@ -106,13 +167,132 @@ public final class CSingleTrackSelectScreen extends Screen {
 
     @Override
     public void onClose() {
+        this.dropdownCoordinator.closeAll();
         this.minecraft.gui.setScreen(this.parent);
     }
 
     @Override
-    @SuppressWarnings("all")
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
-        super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
+        boolean mouseCoveredByDropdown =
+            this.dropdownCoordinator.isMouseOverExpandedOverlay(mouseX, mouseY);
+        super.extractRenderState(
+            guiGraphics,
+            mouseCoveredByDropdown ? Integer.MIN_VALUE : mouseX,
+            mouseCoveredByDropdown ? Integer.MIN_VALUE : mouseY,
+            partialTick
+        );
+        this.dropdownCoordinator.extractOverlays(
+            guiGraphics,
+            mouseX,
+            mouseY,
+            partialTick
+        );
+    }
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        return this.dropdownCoordinator.mouseClicked(
+            event,
+            doubleClick,
+            this::clearFocus
+        )
+            || super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        return this.dropdownCoordinator.mouseReleased(event)
+            || super.mouseReleased(event);
+    }
+
+    @Override
+    public boolean mouseDragged(
+        MouseButtonEvent event,
+        double dragX,
+        double dragY
+    ) {
+        return this.dropdownCoordinator.mouseDragged(event, dragX, dragY)
+            || super.mouseDragged(event, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseScrolled(
+        double mouseX,
+        double mouseY,
+        double horizontalAmount,
+        double verticalAmount
+    ) {
+        return this.dropdownCoordinator.mouseScrolled(
+            mouseX,
+            mouseY,
+            horizontalAmount,
+            verticalAmount
+        ) || super.mouseScrolled(
+            mouseX,
+            mouseY,
+            horizontalAmount,
+            verticalAmount
+        );
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        return this.dropdownCoordinator.keyPressed(event)
+            || super.keyPressed(event);
+    }
+
+    @Override
+    public void removed() {
+        this.dropdownCoordinator.closeAll();
+        super.removed();
+    }
+
+    /**
+     * Absorbs the viewport remainder into the search box while that box remains
+     * no taller than two thirds of one sound row. Once the maximum is reached,
+     * the header is clamped and the list receives the remaining height even
+     * when it cannot end on a complete row. This prevents small scaled
+     * viewports from turning the search field into the dominant part of the
+     * screen.
+     */
+    private void updateHeaderMetrics() {
+        int fixedHeaderHeight = HEADER_VERTICAL_PADDING * 2
+            + this.font.lineHeight
+            + NAMESPACE_SELECTOR_HEIGHT
+            + HEADER_ITEM_SPACING * 2;
+        int minimumHeaderHeight = fixedHeaderHeight
+            + SEARCH_BOX_MIN_HEIGHT;
+        int completeRows = Math.max(
+            1,
+            (
+                this.height
+                    - FOOTER_HEIGHT
+                    - minimumHeaderHeight
+                    - LIST_TOP_PADDING
+            ) / LIST_ROW_HEIGHT
+        );
+        int completeListHeight = LIST_TOP_PADDING
+            + completeRows * LIST_ROW_HEIGHT;
+        int headerHeight = Math.max(
+            minimumHeaderHeight,
+            this.height - FOOTER_HEIGHT - completeListHeight
+        );
+        int idealSearchBoxHeight = Math.max(
+            SEARCH_BOX_MIN_HEIGHT,
+            headerHeight - fixedHeaderHeight
+        );
+
+        this.searchBoxHeight = Math.min(
+            idealSearchBoxHeight,
+            SEARCH_BOX_MAX_HEIGHT
+        );
+        this.alignListToCompleteRows =
+            idealSearchBoxHeight <= SEARCH_BOX_MAX_HEIGHT;
+        headerHeight = fixedHeaderHeight + this.searchBoxHeight;
+        this.layout.setHeaderHeight(headerHeight);
+        if (this.searchBox != null) {
+            this.searchBox.setHeight(this.searchBoxHeight);
+        }
     }
 
     private void reloadSounds() {
@@ -123,30 +303,32 @@ public final class CSingleTrackSelectScreen extends Screen {
         Collection<Identifier> available = this.minecraft.getSoundManager().getAvailableSounds();
         this.allSounds.clear();
         this.allSounds.addAll(available.stream().sorted(Comparator.comparing(Identifier::toString)).toList());
-        this.namespaces = this.allSounds.stream().map(Identifier::getNamespace).distinct().sorted().toList();
-        if (this.namespaces.isEmpty()) {
-            this.namespaces = List.of("minecraft");
-            this.namespaceIndex = 0;
-        } else if (this.namespaceIndex >= this.namespaces.size()) {
-            this.namespaceIndex = 0;
+        String previousNamespace = this.getCurrentNamespace();
+        List<String> availableNamespaces = this.allSounds.stream()
+            .map(Identifier::getNamespace)
+            .distinct()
+            .sorted()
+            .toList();
+        this.namespaces = availableNamespaces.isEmpty()
+            ? List.of("minecraft")
+            : availableNamespaces;
+        int previousIndex = this.namespaces.indexOf(previousNamespace);
+        this.namespaceIndex = previousIndex >= 0 ? previousIndex : 0;
+        if (this.namespaceSelector != null) {
+            this.namespaceSelector.replaceOptions(this.namespaces);
+            this.namespaceSelector.selectValue(this.getCurrentNamespace());
         }
-
-        this.refreshNamespaceLabel();
         this.refreshVisibleEntries();
     }
 
-    private void refreshNamespaceLabel() {
-        if (this.namespaceWidget != null) {
-            this.namespaceWidget.setMessage(this.namespaceComponent());
-            this.layout.arrangeElements();
+    private void selectNamespace(String namespace) {
+        int selectedIndex = this.namespaces.indexOf(namespace);
+        if (selectedIndex < 0 || selectedIndex == this.namespaceIndex) {
+            return;
         }
-    }
 
-    private Component namespaceComponent() {
-        return Component.translatable(
-            "screen.custommusicclientsideplayer.singletrack.namespace",
-            Component.literal(this.getCurrentNamespace()).withStyle(ChatFormatting.AQUA)
-        );
+        this.namespaceIndex = selectedIndex;
+        this.refreshVisibleEntries();
     }
 
     private void refreshVisibleEntries() {
@@ -188,16 +370,6 @@ public final class CSingleTrackSelectScreen extends Screen {
         }
 
         return null;
-    }
-
-    private void nextNamespace() {
-        if (this.namespaces.isEmpty()) {
-            return;
-        }
-
-        this.namespaceIndex = (this.namespaceIndex + 1) % this.namespaces.size();
-        this.refreshNamespaceLabel();
-        this.refreshVisibleEntries();
     }
 
     private String getCurrentNamespace() {
@@ -248,13 +420,40 @@ public final class CSingleTrackSelectScreen extends Screen {
 
     private final class SoundSelectionList extends ObjectSelectionList<SoundSelectionList.Entry> {
         private SoundSelectionList(Minecraft minecraft, CSingleTrackSelectScreen ignoredScreen, int width, int height) {
-            super(minecraft, width, height, 0, 36);
+            super(minecraft, width, height, 0, LIST_ROW_HEIGHT);
             this.centerListVertically = false;
         }
 
+        /**
+         * Uses complete rows while the header can absorb the viewport remainder.
+         * If the search box has reached its height cap, the list instead fills
+         * all remaining space so preserving complete rows cannot enlarge the
+         * search box beyond that cap.
+         */
         @Override
         public void updateSize(int width, HeaderAndFooterLayout layout) {
-            this.updateSizeAndPosition(width, layout.getContentHeight(), 0, layout.getHeaderHeight());
+            int availableHeight = layout.getContentHeight();
+            if (!CSingleTrackSelectScreen.this.alignListToCompleteRows) {
+                this.updateSizeAndPosition(
+                    width,
+                    availableHeight,
+                    0,
+                    layout.getHeaderHeight()
+                );
+                return;
+            }
+
+            int completeRows = Math.max(
+                1,
+                (availableHeight - LIST_TOP_PADDING) / LIST_ROW_HEIGHT
+            );
+            int listHeight = Math.min(
+                availableHeight,
+                LIST_TOP_PADDING + completeRows * LIST_ROW_HEIGHT
+            );
+            int unusedHeight = availableHeight - listHeight;
+            int listY = layout.getHeaderHeight() + unusedHeight / 2;
+            this.updateSizeAndPosition(width, listHeight, 0, listY);
         }
 
         @Override

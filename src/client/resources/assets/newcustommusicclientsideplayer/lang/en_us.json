@@ -1,4 +1,7 @@
 {
+  "narration.newcustommusicclientsideplayer.dropdown.expanded": "Expanded",
+  "narration.newcustommusicclientsideplayer.dropdown.collapsed": "Collapsed",
+
   "key.category.newcustommusicclientsideplayer.newcustom_music_client_side_player": "New Custom Music Client Side Player",
   "key.custommusicclientsideplayer.open_playlist_config": "Open Mod Menu",
   "key.custommusicclientsideplayer.volume_up": "Volume Up",
@@ -112,7 +115,6 @@
   "screen.newcustommusicclientsideplayer.play_instance.shuffle_requires_loop": "Shuffle requires loop to be enabled.",
 
   "screen.custommusicclientsideplayer.singletrack.title": "Select A Song To Play",
-  "screen.custommusicclientsideplayer.singletrack.namespace": "(Namespace: %s)",
   "screen.custommusicclientsideplayer.singletrack.play_selected": "Play Selected Track",
   "screen.newcustommusicclientsideplayer.singletrack.pitch_label": "Enter Pitch (1 if omitted)",
   "screen.newcustommusicclientsideplayer.singletrack.pitch_hint": "Type pitch...",
@@ -130,7 +132,6 @@
   "screen.custommusicclientsideplayer.playlist_editor.available_sounds": "Available Sounds",
   "screen.custommusicclientsideplayer.playlist_editor.available_sounds_with_namespace": "Available Sounds [%s]",
   "screen.custommusicclientsideplayer.playlist_editor.playlist_header": "Playlist [%s]",
-  "screen.custommusicclientsideplayer.playlist_editor.next_namespace": "Next Namespace",
   "screen.custommusicclientsideplayer.playlist_editor.empty": "(empty)",
 
   "screen.custommusicclientsideplayer.view_tracks.title": "View Playlist Tracks",
