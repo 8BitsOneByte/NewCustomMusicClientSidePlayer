@@ -27,8 +27,16 @@ public final class CModConfigEditSession {
         this.draft = this.draft.withCheckForUpdates(enabled);
     }
 
+    /**
+     * Replaces only the editable draft. Import flows use this to preview imported values without
+     * changing the clean applied baseline or saving to disk.
+     */
     public void replaceDraft(CModConfig draft) {
         this.draft = Objects.requireNonNull(draft, "draft");
+    }
+
+    public void resetDraftToDefaults() {
+        this.replaceDraft(CModConfig.defaults());
     }
 
     /**

@@ -26,6 +26,7 @@ import org.exmple.newcustommusicclientsideplayer.client.command.CResumeCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CSkipCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CSkipRandomCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CStopSoundCommand;
+import org.exmple.newcustommusicclientsideplayer.client.gui.CFileDialogUtil;
 import org.exmple.newcustommusicclientsideplayer.client.gui.CMainConfigScreen;
 import org.exmple.newcustommusicclientsideplayer.client.update.CUpdateChecker;
 
@@ -125,6 +126,7 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> CPlaySoundController.stop());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            CFileDialogUtil.shutdown();
             CPlaySoundController.onClientStopping(client);
             try {
                 CPlaybackVolumeSettings.savePlaybackVolumePercent(CPlaySoundController.getPlaybackVolumePercent());
