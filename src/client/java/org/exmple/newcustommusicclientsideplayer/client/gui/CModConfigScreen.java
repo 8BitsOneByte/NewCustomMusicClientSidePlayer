@@ -19,18 +19,23 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
 import org.exmple.newcustommusicclientsideplayer.client.config.CConfigImportException;
 import org.exmple.newcustommusicclientsideplayer.client.config.CConfigImportPreview;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigEditSession;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigRepository;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigTransferService;
-import org.exmple.newcustommusicclientsideplayer.client.update.CUpdateChecker;
+import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedbackMode;
 
 public final class CModConfigScreen extends Screen {
     private static final Component TITLE =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.title");
     private static final Component CHECK_FOR_UPDATES =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.check_for_updates");
+    private static final Component NOW_PLAYING_TOAST =
+        Component.translatable("screen.custommusicclientsideplayer.mod_config.now_playing_toast");
+    private static final Component NOW_PLAYING_FEEDBACK =
+        Component.translatable("screen.custommusicclientsideplayer.mod_config.now_playing_feedback");
     private static final Component APPLY =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.apply");
     private static final Component IMPORT_CONFIG =
@@ -113,6 +118,8 @@ public final class CModConfigScreen extends Screen {
 
     private StringWidget saveErrorWidget;
     private CycleButton<Boolean> checkForUpdatesButton;
+    private CycleButton<Boolean> nowPlayingToastButton;
+    private CycleButton<CNowPlayingFeedbackMode> nowPlayingFeedbackButton;
     private Button importButton;
     private Button exportButton;
     private Button applyButton;
@@ -145,6 +152,32 @@ public final class CModConfigScreen extends Screen {
                     CHECK_FOR_UPDATES,
                     (button, enabled) -> {
                         this.editSession.setCheckForUpdates(enabled);
+                        this.clearSaveError();
+                        this.updateButtonStates();
+                    }
+                )
+        );
+        this.nowPlayingToastButton = rows.addChild(
+            CycleButton.onOffBuilder(this.editSession.draft().nowPlayingToastEnabled())
+                .create(
+                    NOW_PLAYING_TOAST,
+                    (button, enabled) -> {
+                        this.editSession.setNowPlayingToastEnabled(enabled);
+                        this.clearSaveError();
+                        this.updateButtonStates();
+                    }
+                )
+        );
+        this.nowPlayingFeedbackButton = rows.addChild(
+            CycleButton.<CNowPlayingFeedbackMode>builder(
+                    CModConfigScreen::feedbackModeLabel,
+                    this.editSession.draft().nowPlayingFeedbackMode()
+                )
+                .withValues(CNowPlayingFeedbackMode.values())
+                .create(
+                    NOW_PLAYING_FEEDBACK,
+                    (button, mode) -> {
+                        this.editSession.setNowPlayingFeedbackMode(mode);
                         this.clearSaveError();
                         this.updateButtonStates();
                     }
@@ -262,7 +295,7 @@ public final class CModConfigScreen extends Screen {
             return;
         }
 
-        CUpdateChecker.applyCheckForUpdates(this.editSession.draft().checkForUpdates());
+        NewcustommusicclientsideplayerClient.applyModConfig(this.editSession.draft());
         this.editSession.applyDraft();
         this.clearSaveError();
         this.updateButtonStates();
@@ -308,7 +341,7 @@ public final class CModConfigScreen extends Screen {
             return;
         }
 
-        this.minecraft.gui.setScreen(new CConfigImportMessageScreen(
+        this.minecraft.gui.setScreen(new CImportMessageScreen(
             this,
             IMPORT_WARNING_TITLE,
             IMPORT_WARNING_BODY,
@@ -420,9 +453,9 @@ public final class CModConfigScreen extends Screen {
 
     private void showImportSuccess(Path path) {
         if (this.minecraft != null) {
-            CConfigTransferToast.show(
+            CTransferToast.show(
                 this.minecraft,
-                CConfigTransferToast.Kind.SUCCESS,
+                CTransferToast.Kind.SUCCESS,
                 IMPORT_SUCCESS_TOAST_TITLE,
                 Component.translatable(IMPORT_SUCCESS_TOAST_DESCRIPTION_KEY, displayPath(path))
             );
@@ -431,9 +464,9 @@ public final class CModConfigScreen extends Screen {
 
     private void showExportSuccess(Path path) {
         if (this.minecraft != null) {
-            CConfigTransferToast.show(
+            CTransferToast.show(
                 this.minecraft,
-                CConfigTransferToast.Kind.SUCCESS,
+                CTransferToast.Kind.SUCCESS,
                 EXPORT_SUCCESS_TOAST_TITLE,
                 Component.translatable(EXPORT_SUCCESS_TOAST_DESCRIPTION_KEY, displayPath(path))
             );
@@ -442,9 +475,9 @@ public final class CModConfigScreen extends Screen {
 
     private void showExportError(Path path) {
         if (this.minecraft != null) {
-            CConfigTransferToast.show(
+            CTransferToast.show(
                 this.minecraft,
-                CConfigTransferToast.Kind.FAILURE,
+                CTransferToast.Kind.FAILURE,
                 EXPORT_FAILED_TOAST_TITLE,
                 Component.translatable(EXPORT_FAILED_TOAST_DESCRIPTION_KEY, displayPath(path))
             );
@@ -454,9 +487,9 @@ public final class CModConfigScreen extends Screen {
 
     private void showExportDialogError() {
         if (this.minecraft != null) {
-            CConfigTransferToast.show(
+            CTransferToast.show(
                 this.minecraft,
-                CConfigTransferToast.Kind.FAILURE,
+                CTransferToast.Kind.FAILURE,
                 EXPORT_FAILED_TOAST_TITLE,
                 Component.translatable(EXPORT_DIALOG_FAILED_TOAST_DESCRIPTION_KEY)
             );
@@ -483,7 +516,7 @@ public final class CModConfigScreen extends Screen {
 
     private void openImportMessageScreen(Component title, Component body) {
         if (this.minecraft != null) {
-            this.minecraft.gui.setScreen(new CConfigImportMessageScreen(
+            this.minecraft.gui.setScreen(new CImportMessageScreen(
                 this,
                 title,
                 body,
@@ -501,10 +534,24 @@ public final class CModConfigScreen extends Screen {
         if (this.checkForUpdatesButton != null) {
             this.checkForUpdatesButton.setValue(this.editSession.draft().checkForUpdates());
         }
+        if (this.nowPlayingToastButton != null) {
+            this.nowPlayingToastButton.setValue(this.editSession.draft().nowPlayingToastEnabled());
+        }
+        if (this.nowPlayingFeedbackButton != null) {
+            this.nowPlayingFeedbackButton.setValue(this.editSession.draft().nowPlayingFeedbackMode());
+        }
     }
 
     private static String displayPath(Path path) {
         return path.toAbsolutePath().normalize().toString();
+    }
+
+    private static Component feedbackModeLabel(CNowPlayingFeedbackMode mode) {
+        return Component.translatable(switch (mode) {
+            case CHAT -> "screen.custommusicclientsideplayer.mod_config.now_playing_feedback.chat";
+            case OVERLAY -> "screen.custommusicclientsideplayer.mod_config.now_playing_feedback.overlay";
+            case OFF -> "screen.custommusicclientsideplayer.mod_config.now_playing_feedback.off";
+        });
     }
 
     private void returnToParent() {

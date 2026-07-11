@@ -131,6 +131,36 @@ public final class CPlaylistRepository {
         writeData(data);
     }
 
+    public static synchronized List<ExportPlaylist> exportPlaylists() throws IOException {
+        StoredData data = readData();
+        List<ExportPlaylist> playlists = new ArrayList<>();
+        for (Map.Entry<String, StoredPlaylist> entry : data.playlists.entrySet()) {
+            playlists.add(new ExportPlaylist(
+                entry.getKey(),
+                entry.getValue().tracks,
+                entry.getValue().modifiedAt
+            ));
+        }
+
+        return playlists;
+    }
+
+    public static synchronized ImportResult importPlaylists(List<ImportPlaylist> playlists) throws IOException {
+        StoredData data = readData();
+        for (ImportPlaylist playlist : playlists) {
+            StoredPlaylist storedPlaylist = new StoredPlaylist();
+            storedPlaylist.tracks = playlist.tracks()
+                .stream()
+                .map(Identifier::toString)
+                .collect(Collectors.toCollection(ArrayList::new));
+            storedPlaylist.modifiedAt = playlist.modifiedAt();
+            data.playlists.put(playlist.name(), storedPlaylist);
+        }
+
+        writeData(data);
+        return new ImportResult(playlists.size());
+    }
+
     private static StoredData readData() throws IOException {
         if (!Files.exists(FILE_PATH)) {
             return new StoredData();
@@ -220,6 +250,21 @@ public final class CPlaylistRepository {
         public long modifiedAt() {
             return this.modifiedAt;
         }
+    }
+
+    public record ExportPlaylist(String name, List<String> tracks, long modifiedAt) {
+        public ExportPlaylist {
+            tracks = List.copyOf(tracks);
+        }
+    }
+
+    public record ImportPlaylist(String name, List<Identifier> tracks, long modifiedAt) {
+        public ImportPlaylist {
+            tracks = List.copyOf(tracks);
+        }
+    }
+
+    public record ImportResult(int importedCount) {
     }
 
     private static final class StoredData {

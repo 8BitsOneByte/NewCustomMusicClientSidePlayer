@@ -14,6 +14,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundSource;
+import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedbackMode;
 import org.exmple.newcustommusicclientsideplayer.client.customnowplayingtoast.CCustomNowPlayingToast;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaybackVolumeSettings;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
@@ -288,9 +290,7 @@ public final class CPlaySoundController {
         }
 
         lastSessionMode = SessionMode.SINGLE_TRACK;
-        if (client.player != null) {
-            client.player.sendSystemMessage(buildSingleTrackMessage(soundId, loop, pitch));
-        }
+        announceSingleTrackStarted(client, soundId, loop, pitch);
 
         return 1;
     }
@@ -610,7 +610,19 @@ public final class CPlaySoundController {
             return;
         }
 
+        CNowPlayingFeedbackMode feedbackMode = NewcustommusicclientsideplayerClient.getModConfig().nowPlayingFeedbackMode();
+        if (feedbackMode == CNowPlayingFeedbackMode.OFF) {
+            skipNextNowPlayingHeader = false;
+            return;
+        }
+
         String songName = getDisplayName(soundId);
+        if (feedbackMode == CNowPlayingFeedbackMode.OVERLAY) {
+            skipNextNowPlayingHeader = false;
+            client.player.sendOverlayMessage(buildPlaylistOverlayMessage(songName, index, total));
+            return;
+        }
+
         MutableComponent message = Component.empty();
         if (skipNextNowPlayingHeader) {
             skipNextNowPlayingHeader = false;
@@ -633,6 +645,9 @@ public final class CPlaySoundController {
 
     private static void announcePlaylistStart(Minecraft client, boolean loop) {
         if (client.player == null) {
+            return;
+        }
+        if (NewcustommusicclientsideplayerClient.getModConfig().nowPlayingFeedbackMode() != CNowPlayingFeedbackMode.CHAT) {
             return;
         }
 
@@ -666,6 +681,43 @@ public final class CPlaySoundController {
             .append(Component.literal(loop ? "true" : "false").withStyle(loop ? ChatFormatting.GREEN : ChatFormatting.RED))
             .append(Component.literal(", pitch=").withStyle(ChatFormatting.WHITE))
             .append(Component.literal(formatPitch(pitch)).withStyle(ChatFormatting.GREEN));
+    }
+
+    public static void announceSingleTrackStarted(Minecraft client, Identifier soundId, boolean loop, float pitch) {
+        if (client.player == null) {
+            return;
+        }
+
+        switch (NewcustommusicclientsideplayerClient.getModConfig().nowPlayingFeedbackMode()) {
+            case CHAT -> client.player.sendSystemMessage(buildSingleTrackMessage(soundId, loop, pitch));
+            case OVERLAY -> client.player.sendOverlayMessage(buildSingleTrackOverlayMessage(soundId));
+            case OFF -> {
+            }
+        }
+    }
+
+    private static MutableComponent buildPlaylistOverlayMessage(String songName, int index, int total) {
+        return Component.empty()
+            .append(Component.translatable("message.custommusicclientsideplayer.now_playing_header")
+                .withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD))
+            .append(Component.literal(" "))
+            .append(Component.literal(playlistName == null ? "(unknown)" : playlistName).withStyle(ChatFormatting.AQUA))
+            .append(Component.literal("("))
+            .append(Component.literal(String.valueOf(index)).withStyle(ChatFormatting.GOLD))
+            .append(Component.literal("/"))
+            .append(Component.literal(String.valueOf(total)).withStyle(ChatFormatting.GOLD))
+            .append(Component.literal("):"))
+            .append(Component.literal(songName).withStyle(ChatFormatting.YELLOW));
+    }
+
+    private static MutableComponent buildSingleTrackOverlayMessage(Identifier soundId) {
+        return Component.empty()
+            .append(Component.translatable("message.custommusicclientsideplayer.now_playing_header")
+                .withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD))
+            .append(Component.literal(" "))
+            .append(Component.literal(soundId.getNamespace()).withStyle(ChatFormatting.GRAY))
+            .append(Component.literal(":"))
+            .append(Component.literal(getDisplayName(soundId)).withStyle(ChatFormatting.YELLOW));
     }
 
     private static String getDisplayName(Identifier id) {
@@ -702,6 +754,10 @@ public final class CPlaySoundController {
     }
 
     private static void showCustomNowPlayingToast(Minecraft client, Identifier soundId) {
+        if (!NewcustommusicclientsideplayerClient.getModConfig().nowPlayingToastEnabled()) {
+            return;
+        }
+
         CCustomNowPlayingToast.show(
             client,
             Component.literal(soundId.getNamespace() + "-" + getDisplayName(soundId))

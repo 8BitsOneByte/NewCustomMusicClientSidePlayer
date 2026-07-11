@@ -28,6 +28,8 @@ public final class CModConfigTransferService {
     private static final String CONFIG_KEY = "config";
     private static final String MOD_ID_KEY = "modId";
     private static final String CHECK_FOR_UPDATES_KEY = "checkForUpdates";
+    private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
+    private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
 
     public String defaultFileName() {
         return sanitizeFileName(modName()) + "-" + sanitizeFileName(modVersion()) + "-config.txt";
@@ -130,6 +132,25 @@ public final class CModConfigTransferService {
                 skippedFields.add(CHECK_FOR_UPDATES_KEY);
             }
         }
+        if (configObject.has(NOW_PLAYING_TOAST_ENABLED_KEY)) {
+            JsonElement element = configObject.get(NOW_PLAYING_TOAST_ENABLED_KEY);
+            if (element instanceof JsonPrimitive primitive && primitive.isBoolean()) {
+                compatibleConfig = compatibleConfig.withNowPlayingToastEnabled(primitive.getAsBoolean());
+                hasCompatibleSettings = true;
+            } else {
+                skippedFields.add(NOW_PLAYING_TOAST_ENABLED_KEY);
+            }
+        }
+        if (configObject.has(NOW_PLAYING_FEEDBACK_MODE_KEY)) {
+            JsonElement element = configObject.get(NOW_PLAYING_FEEDBACK_MODE_KEY);
+            CNowPlayingFeedbackMode mode = readNowPlayingFeedbackMode(element);
+            if (mode != null) {
+                compatibleConfig = compatibleConfig.withNowPlayingFeedbackMode(mode);
+                hasCompatibleSettings = true;
+            } else {
+                skippedFields.add(NOW_PLAYING_FEEDBACK_MODE_KEY);
+            }
+        }
 
         if (!hasCompatibleSettings) {
             throw CConfigImportException.noCompatibleSettings();
@@ -140,6 +161,16 @@ public final class CModConfigTransferService {
             !compatibleConfig.equals(currentConfig),
             skippedFields
         );
+    }
+
+    private static CNowPlayingFeedbackMode readNowPlayingFeedbackMode(JsonElement element) {
+        if (element instanceof JsonPrimitive primitive && primitive.isString()) {
+            try {
+                return CNowPlayingFeedbackMode.valueOf(primitive.getAsString());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return null;
     }
 
     private static String modName() {

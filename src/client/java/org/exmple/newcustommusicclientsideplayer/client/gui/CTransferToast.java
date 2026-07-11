@@ -11,7 +11,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
-public final class CConfigTransferToast implements Toast {
+public final class CTransferToast implements Toast {
     private static final Identifier BACKGROUND_SPRITE = Identifier.withDefaultNamespace("toast/advancement");
     private static final int WIDTH = 160;
     private static final int HEIGHT = 32;
@@ -34,7 +34,7 @@ public final class CConfigTransferToast implements Toast {
     private boolean changed = true;
     private Toast.Visibility wantedVisibility = Toast.Visibility.HIDE;
 
-    private CConfigTransferToast(Kind kind, Component title, Component description) {
+    private CTransferToast(Kind kind, Component title, Component description) {
         this.kind = kind;
         this.title = title;
         this.description = description;
@@ -42,9 +42,9 @@ public final class CConfigTransferToast implements Toast {
 
     public static void show(Minecraft client, Kind kind, Component title, Component description) {
         ToastManager toastManager = client.gui.toastManager();
-        CConfigTransferToast toast = toastManager.getToast(CConfigTransferToast.class, kind);
+        CTransferToast toast = toastManager.getToast(CTransferToast.class, kind);
         if (toast == null) {
-            toastManager.addToast(new CConfigTransferToast(kind, title, description));
+            toastManager.addToast(new CTransferToast(kind, title, description));
             return;
         }
 

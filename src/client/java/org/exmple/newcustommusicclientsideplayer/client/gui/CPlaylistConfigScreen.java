@@ -1,6 +1,7 @@
 package org.exmple.newcustommusicclientsideplayer.client.gui;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -13,10 +14,12 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.layouts.GridLayout;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
+import net.minecraft.client.gui.layouts.SpacerElement;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -28,15 +31,49 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistImportException;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistImportPreview;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistRepository;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistTransferService;
 
 public class CPlaylistConfigScreen extends Screen {
     private static final Component TITLE = Component.translatable("screen.custommusicclientsideplayer.config_playlists.title");
     private static final Component SEARCH_HINT = Component.translatable("screen.custommusicclientsideplayer.search").withStyle(EditBox.SEARCH_HINT_STYLE);
+    private static final Component IMPORT_PLAYLISTS_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_tooltip");
+    private static final Component EXPORT_PLAYLISTS_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.export_tooltip");
+    private static final Component MUST_DISABLE_FULLSCREEN = Component.translatable("screen.custommusicclientsideplayer.mod_config.must_disable_fullscreen");
+    private static final Component IMPORT_DIALOG_TITLE = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_dialog_title");
+    private static final Component IMPORT_DIALOG_FILTER = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_dialog_filter");
+    private static final Component EXPORT_DIALOG_TITLE = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.export_dialog_title");
+    private static final Component EXPORT_DIALOG_FILTER = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.export_dialog_filter");
+    private static final Component IMPORT_SUCCESS_TOAST_TITLE = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.toast.import_success.title");
+    private static final String IMPORT_SUCCESS_TOAST_DESCRIPTION_KEY = "screen.custommusicclientsideplayer.playlist_transfer.toast.import_success.description";
+    private static final Component EXPORT_SUCCESS_TOAST_TITLE = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.toast.export_success.title");
+    private static final String EXPORT_SUCCESS_TOAST_DESCRIPTION_KEY = "screen.custommusicclientsideplayer.playlist_transfer.toast.export_success.description";
+    private static final Component EXPORT_FAILED_TOAST_TITLE = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.toast.export_failed.title");
+    private static final String EXPORT_FAILED_TOAST_DESCRIPTION_KEY = "screen.custommusicclientsideplayer.playlist_transfer.toast.export_failed.description";
+    private static final String EXPORT_DIALOG_FAILED_TOAST_DESCRIPTION_KEY = "screen.custommusicclientsideplayer.playlist_transfer.toast.export_dialog_failed.description";
+    private static final Component IMPORT_BACK = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_back");
+    private static final Component IMPORT_CANCEL = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_cancel");
+    private static final Component IMPORT_IO_ERROR_TITLE = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_io_error.title");
+    private static final Component IMPORT_IO_ERROR_BODY = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_io_error.body");
+    private static final Component IMPORT_INVALID_TITLE = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_invalid.title");
+    private static final Component IMPORT_INVALID_BODY = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_invalid.body");
+    private static final Component IMPORT_NO_COMPATIBLE_TITLE = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_no_compatible.title");
+    private static final Component IMPORT_NO_COMPATIBLE_BODY = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_no_compatible.body");
+    private static final Component IMPORT_WARNING_TITLE = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_warning.title");
+    private static final Component IMPORT_WARNING_BODY = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_warning.body");
+    private static final Component IMPORT_WARNING_CONFIRM = Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_warning.confirm");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy/M/d HH:mm");
     private static final int ICON_SIZE = 32;
+    private static final int TRANSFER_BUTTON_SIZE = 20;
+    private static final int TRANSFER_BUTTON_OFFSET = 8;
+    private static final int HEADER_ROW_SPACING = 4;
+    private static final int TRANSFER_BUTTON_BALANCE_WIDTH = TRANSFER_BUTTON_OFFSET + TRANSFER_BUTTON_SIZE * 2 + HEADER_ROW_SPACING * 2;
     private static final int SMALL_BUTTON_WIDTH = 71;
     private static final Identifier LIST_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/listicon.png");
+    private static final Identifier IMPORT_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/import.png");
+    private static final Identifier EXPORT_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/export.png");
     private static final Identifier VIEW_HIGHLIGHTED_SPRITE = Identifier.withDefaultNamespace("world_list/join_highlighted");
     private static final Identifier VIEW_SPRITE = Identifier.withDefaultNamespace("world_list/join");
     private static final Identifier MOVE_UP_HIGHLIGHTED_SPRITE = Identifier.withDefaultNamespace("transferable_list/move_up_highlighted");
@@ -59,11 +96,14 @@ public class CPlaylistConfigScreen extends Screen {
     private static final int MOVE_DOWN_MAX_Y_EXCLUSIVE = 27;
 
     private final Screen parent;
+    private final CPlaylistTransferService transferService = new CPlaylistTransferService();
     private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this, 8 + 9 + 8 + 20 + 4, 60);
     private PlaylistSelectionList playlistSelectionList;
     private EditBox searchBox;
     private String filter = "";
 
+    private Button importButton;
+    private Button exportButton;
     private Button playSelectedListButton;
     private Button editButton;
     private Button deleteButton;
@@ -81,7 +121,8 @@ public class CPlaylistConfigScreen extends Screen {
         LinearLayout header = this.layout.addToHeader(LinearLayout.vertical().spacing(4));
         header.defaultCellSetting().alignHorizontallyCenter();
         header.addChild(new StringWidget(this.title, this.font));
-        LinearLayout searchRow = header.addChild(LinearLayout.horizontal().spacing(4));
+        LinearLayout searchRow = header.addChild(LinearLayout.horizontal().spacing(HEADER_ROW_SPACING));
+        searchRow.addChild(SpacerElement.width(TRANSFER_BUTTON_BALANCE_WIDTH));
         this.searchBox = searchRow.addChild(
             new EditBox(this.font, this.width / 2 - 100, 22, 200, 20, this.searchBox, Component.translatable("screen.custommusicclientsideplayer.search"))
         );
@@ -91,6 +132,19 @@ public class CPlaylistConfigScreen extends Screen {
             this.filter = value;
             this.refreshVisibleEntries();
         });
+        searchRow.addChild(SpacerElement.width(TRANSFER_BUTTON_OFFSET));
+        this.importButton = searchRow.addChild(
+            Button.builder(Component.empty(), button -> this.onImportPlaylists())
+                .width(TRANSFER_BUTTON_SIZE)
+                .tooltip(Tooltip.create(IMPORT_PLAYLISTS_TOOLTIP))
+                .build()
+        );
+        this.exportButton = searchRow.addChild(
+            Button.builder(Component.empty(), button -> this.onExportPlaylists())
+                .width(TRANSFER_BUTTON_SIZE)
+                .tooltip(Tooltip.create(EXPORT_PLAYLISTS_TOOLTIP))
+                .build()
+        );
 
         this.playlistSelectionList = this.layout.addToContents(new PlaylistSelectionList(this.minecraft, this, this.width, this.layout.getContentHeight()));
 
@@ -145,6 +199,14 @@ public class CPlaylistConfigScreen extends Screen {
     }
 
     @Override
+    public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        this.updateButtonStates();
+        super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
+        this.extractTransferButtonIcon(guiGraphics, this.importButton, IMPORT_ICON);
+        this.extractTransferButtonIcon(guiGraphics, this.exportButton, EXPORT_ICON);
+    }
+
+    @Override
     public void onClose() {
         this.minecraft.gui.setScreen(this.parent);
     }
@@ -178,6 +240,18 @@ public class CPlaylistConfigScreen extends Screen {
 
     private void updateButtonStates() {
         boolean hasSelection = this.getSelectedSummary() != null;
+        boolean fullscreen = this.minecraft != null && this.minecraft.getWindow().isFullscreen();
+        Tooltip fullscreenTooltip = fullscreen ? Tooltip.create(MUST_DISABLE_FULLSCREEN) : null;
+        if (this.importButton != null) {
+            this.importButton.active = !fullscreen;
+            this.importButton.setTooltip(fullscreen ? fullscreenTooltip : Tooltip.create(IMPORT_PLAYLISTS_TOOLTIP));
+        }
+
+        if (this.exportButton != null) {
+            this.exportButton.active = !fullscreen;
+            this.exportButton.setTooltip(fullscreen ? fullscreenTooltip : Tooltip.create(EXPORT_PLAYLISTS_TOOLTIP));
+        }
+
         if (this.playSelectedListButton != null) {
             this.playSelectedListButton.active = hasSelection;
         }
@@ -195,6 +269,39 @@ public class CPlaylistConfigScreen extends Screen {
         }
     }
 
+    private void extractTransferButtonIcon(GuiGraphicsExtractor guiGraphics, Button button, Identifier icon) {
+        if (button == null || !button.visible) {
+            return;
+        }
+
+        int iconSize = 16;
+        int iconX = button.getX() + (button.getWidth() - iconSize) / 2;
+        int iconY = button.getY() + (button.getHeight() - iconSize) / 2;
+        guiGraphics.blit(
+            RenderPipelines.GUI_TEXTURED,
+            icon,
+            iconX,
+            iconY,
+            0.0F,
+            0.0F,
+            iconSize,
+            iconSize,
+            32,
+            32,
+            32,
+            32
+        );
+        if (!button.active) {
+            guiGraphics.fill(
+                iconX,
+                iconY,
+                iconX + iconSize,
+                iconY + iconSize,
+                0x99000000
+            );
+        }
+    }
+
     private CPlaylistRepository.PlaylistSummary getSelectedSummary() {
         if (this.playlistSelectionList == null) {
             return null;
@@ -206,6 +313,194 @@ public class CPlaylistConfigScreen extends Screen {
         }
 
         return null;
+    }
+
+    private void onImportPlaylists() {
+        if (this.minecraft == null || this.minecraft.getWindow().isFullscreen()) {
+            return;
+        }
+
+        CFileDialogUtil.fileSelectDialog(
+            CFileDialogUtil.DialogType.OPEN,
+            IMPORT_DIALOG_TITLE.getString(),
+            null,
+            IMPORT_DIALOG_FILTER.getString(),
+            "*.txt"
+        ).whenComplete((selectedPath, throwable) -> this.minecraft.execute(() -> {
+            if (this.minecraft.gui.screen() != this) {
+                return;
+            }
+
+            if (throwable != null) {
+                this.openImportMessageScreen(IMPORT_IO_ERROR_TITLE, IMPORT_IO_ERROR_BODY);
+                return;
+            }
+
+            selectedPath.ifPresent(this::handleImportPath);
+        }));
+    }
+
+    private void handleImportPath(Path path) {
+        CPlaylistImportPreview preview;
+        try {
+            preview = this.transferService.previewImport(path);
+        } catch (CPlaylistImportException exception) {
+            this.openImportExceptionScreen(exception);
+            return;
+        }
+
+        if (preview.hasWarnings()) {
+            this.openImportWarningScreen(preview);
+            return;
+        }
+
+        this.applyImportPreview(preview);
+    }
+
+    private boolean applyImportPreview(CPlaylistImportPreview preview) {
+        try {
+            CPlaylistRepository.ImportResult result = this.transferService.importPreview(preview);
+            this.reloadEntries();
+            this.showImportSuccess(result.importedCount());
+            return true;
+        } catch (IOException | RuntimeException exception) {
+            this.openImportMessageScreen(IMPORT_IO_ERROR_TITLE, IMPORT_IO_ERROR_BODY);
+            return false;
+        }
+    }
+
+    private void onExportPlaylists() {
+        if (this.minecraft == null || this.minecraft.getWindow().isFullscreen()) {
+            return;
+        }
+
+        CFileDialogUtil.fileSelectDialog(
+            CFileDialogUtil.DialogType.SAVE,
+            EXPORT_DIALOG_TITLE.getString(),
+            Path.of(this.transferService.defaultFileName()),
+            EXPORT_DIALOG_FILTER.getString(),
+            "*.txt"
+        ).whenComplete((selectedPath, throwable) -> this.minecraft.execute(() -> {
+            if (this.minecraft.gui.screen() != this) {
+                return;
+            }
+
+            if (throwable != null) {
+                this.showExportDialogError();
+                return;
+            }
+
+            selectedPath.ifPresent(this::handleExportPath);
+        }));
+    }
+
+    private void handleExportPath(Path path) {
+        try {
+            this.transferService.exportPlaylists(path);
+        } catch (IOException | RuntimeException exception) {
+            this.showExportError(path);
+            return;
+        }
+
+        this.showExportSuccess(path);
+        this.updateButtonStates();
+    }
+
+    private void openImportExceptionScreen(CPlaylistImportException exception) {
+        switch (exception.reason()) {
+            case IO_ERROR -> this.openImportMessageScreen(IMPORT_IO_ERROR_TITLE, IMPORT_IO_ERROR_BODY);
+            case INVALID_PLAYLIST_FILE -> this.openImportMessageScreen(IMPORT_INVALID_TITLE, IMPORT_INVALID_BODY);
+            case NO_COMPATIBLE_PLAYLISTS -> this.openImportMessageScreen(
+                IMPORT_NO_COMPATIBLE_TITLE,
+                IMPORT_NO_COMPATIBLE_BODY
+            );
+        }
+    }
+
+    private void openImportMessageScreen(Component title, Component body) {
+        if (this.minecraft != null) {
+            this.minecraft.gui.setScreen(new CImportMessageScreen(
+                this,
+                title,
+                body,
+                null,
+                List.of(),
+                IMPORT_BACK,
+                () -> this.minecraft.gui.setScreen(this),
+                null,
+                null
+            ));
+        }
+    }
+
+    private void openImportWarningScreen(CPlaylistImportPreview preview) {
+        if (this.minecraft != null) {
+            this.minecraft.gui.setScreen(new CImportMessageScreen(
+                this,
+                IMPORT_WARNING_TITLE,
+                IMPORT_WARNING_BODY,
+                null,
+                CPlaylistImportWarningFormatter.format(preview),
+                IMPORT_CANCEL,
+                () -> this.minecraft.gui.setScreen(this),
+                IMPORT_WARNING_CONFIRM,
+                () -> {
+                    if (this.applyImportPreview(preview)) {
+                        this.minecraft.gui.setScreen(this);
+                    }
+                }
+            ));
+        }
+    }
+
+    private void showImportSuccess(int importedCount) {
+        if (this.minecraft != null) {
+            CTransferToast.show(
+                this.minecraft,
+                CTransferToast.Kind.SUCCESS,
+                IMPORT_SUCCESS_TOAST_TITLE,
+                Component.translatable(IMPORT_SUCCESS_TOAST_DESCRIPTION_KEY, importedCount)
+            );
+        }
+    }
+
+    private void showExportSuccess(Path path) {
+        if (this.minecraft != null) {
+            CTransferToast.show(
+                this.minecraft,
+                CTransferToast.Kind.SUCCESS,
+                EXPORT_SUCCESS_TOAST_TITLE,
+                Component.translatable(EXPORT_SUCCESS_TOAST_DESCRIPTION_KEY, displayPath(path))
+            );
+        }
+    }
+
+    private void showExportError(Path path) {
+        if (this.minecraft != null) {
+            CTransferToast.show(
+                this.minecraft,
+                CTransferToast.Kind.FAILURE,
+                EXPORT_FAILED_TOAST_TITLE,
+                Component.translatable(EXPORT_FAILED_TOAST_DESCRIPTION_KEY, displayPath(path))
+            );
+        }
+        this.updateButtonStates();
+    }
+
+    private void showExportDialogError() {
+        if (this.minecraft != null) {
+            CTransferToast.show(
+                this.minecraft,
+                CTransferToast.Kind.FAILURE,
+                EXPORT_FAILED_TOAST_TITLE,
+                Component.translatable(EXPORT_DIALOG_FAILED_TOAST_DESCRIPTION_KEY)
+            );
+        }
+        this.updateButtonStates();
+    }
+
+    private static String displayPath(Path path) {
+        return path.toAbsolutePath().normalize().toString();
     }
 
     private void onPlaySelected() {
@@ -472,6 +767,7 @@ public class CPlaylistConfigScreen extends Screen {
                 }
             }
 
+            this.refreshScrollAmount();
             this.setSelected(null);
             this.screen.updateButtonStates();
         }

@@ -6,6 +6,8 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedbackMode;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
 
 public final class CStopSoundCommand {
@@ -34,14 +36,29 @@ public final class CStopSoundCommand {
 
         CPlaySoundController.SessionMode mode = CPlaySoundController.getLastSessionMode();
         CPlaySoundController.stop();
-        source.getPlayer().sendSystemMessage(buildStopMessage(mode));
+        announceStop(source, mode);
         return 1;
+    }
+
+    private static void announceStop(FabricClientCommandSource source, CPlaySoundController.SessionMode mode) {
+        CNowPlayingFeedbackMode feedbackMode = NewcustommusicclientsideplayerClient.getModConfig().nowPlayingFeedbackMode();
+        switch (feedbackMode) {
+            case CHAT -> source.getPlayer().sendSystemMessage(buildStopMessage(mode));
+            case OVERLAY -> source.getPlayer().sendOverlayMessage(buildStopOverlayMessage(mode));
+            case OFF -> {
+            }
+        }
     }
 
     private static MutableComponent buildStopMessage(CPlaySoundController.SessionMode mode) {
         return Component.empty()
                 .append(getModeHeader(mode))
                 .append(Component.literal("\n"))
+                .append(Component.translatable("command.custommusicclientsideplayer.cstopsound.stopped").withStyle(ChatFormatting.RED));
+    }
+
+    private static MutableComponent buildStopOverlayMessage(CPlaySoundController.SessionMode mode) {
+        return Component.empty()
                 .append(Component.translatable("command.custommusicclientsideplayer.cstopsound.stopped").withStyle(ChatFormatting.RED));
     }
 

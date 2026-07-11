@@ -20,6 +20,9 @@ import org.exmple.newcustommusicclientsideplayer.client.bootstrap.Newcustommusic
 
 public final class CModConfigRepository {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final String CHECK_FOR_UPDATES_KEY = "checkForUpdates";
+    private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
+    private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
 
     private final Path configPath;
 
@@ -45,11 +48,19 @@ public final class CModConfigRepository {
                 return CModConfig.defaults();
             }
 
-            return new CModConfig(readBoolean(
-                object,
-                "checkForUpdates",
-                CModConfig.DEFAULT_CHECK_FOR_UPDATES
-            ));
+            return new CModConfig(
+                readBoolean(object, CHECK_FOR_UPDATES_KEY, CModConfig.DEFAULT_CHECK_FOR_UPDATES),
+                readBoolean(
+                    object,
+                    NOW_PLAYING_TOAST_ENABLED_KEY,
+                    CModConfig.DEFAULT_NOW_PLAYING_TOAST_ENABLED
+                ),
+                readNowPlayingFeedbackMode(
+                    object,
+                    NOW_PLAYING_FEEDBACK_MODE_KEY,
+                    CModConfig.DEFAULT_NOW_PLAYING_FEEDBACK_MODE
+                )
+            );
         } catch (IOException | RuntimeException exception) {
             return CModConfig.defaults();
         }
@@ -73,7 +84,9 @@ public final class CModConfigRepository {
         boolean replaced = false;
         try {
             JsonObject root = new JsonObject();
-            root.addProperty("checkForUpdates", config.checkForUpdates());
+            root.addProperty(CHECK_FOR_UPDATES_KEY, config.checkForUpdates());
+            root.addProperty(NOW_PLAYING_TOAST_ENABLED_KEY, config.nowPlayingToastEnabled());
+            root.addProperty(NOW_PLAYING_FEEDBACK_MODE_KEY, config.nowPlayingFeedbackMode().name());
             try (Writer writer = Files.newBufferedWriter(temporaryPath, StandardCharsets.UTF_8)) {
                 GSON.toJson(root, writer);
             }
@@ -104,6 +117,21 @@ public final class CModConfigRepository {
         JsonElement element = object.get(key);
         if (element instanceof JsonPrimitive primitive && primitive.isBoolean()) {
             return primitive.getAsBoolean();
+        }
+        return defaultValue;
+    }
+
+    private static CNowPlayingFeedbackMode readNowPlayingFeedbackMode(
+        JsonObject object,
+        String key,
+        CNowPlayingFeedbackMode defaultValue
+    ) {
+        JsonElement element = object.get(key);
+        if (element instanceof JsonPrimitive primitive && primitive.isString()) {
+            try {
+                return CNowPlayingFeedbackMode.valueOf(primitive.getAsString());
+            } catch (IllegalArgumentException ignored) {
+            }
         }
         return defaultValue;
     }

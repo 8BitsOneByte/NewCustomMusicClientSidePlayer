@@ -27,6 +27,14 @@ public final class CModConfigEditSession {
         this.draft = this.draft.withCheckForUpdates(enabled);
     }
 
+    public void setNowPlayingToastEnabled(boolean enabled) {
+        this.draft = this.draft.withNowPlayingToastEnabled(enabled);
+    }
+
+    public void setNowPlayingFeedbackMode(CNowPlayingFeedbackMode mode) {
+        this.draft = this.draft.withNowPlayingFeedbackMode(mode);
+    }
+
     /**
      * Replaces only the editable draft. Import flows use this to preview imported values without
      * changing the clean applied baseline or saving to disk.

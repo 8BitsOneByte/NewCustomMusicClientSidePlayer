@@ -89,7 +89,7 @@ public final class CPlaySoundCommand {
 
         int result = CPlaySoundController.play(source, soundId, loop, pitch);
         if (result > 0) {
-            source.getPlayer().sendSystemMessage(CPlaySoundController.buildSingleTrackMessage(soundId, loop, pitch));
+            CPlaySoundController.announceSingleTrackStarted(source.getClient(), soundId, loop, pitch);
         }
 
         return result;

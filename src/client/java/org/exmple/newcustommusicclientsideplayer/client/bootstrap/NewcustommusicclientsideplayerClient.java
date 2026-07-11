@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import java.util.Objects;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -36,6 +37,7 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
     private static long nextAllowedPlaylistArrowSkipTick;
     private static boolean previousTrackKeyHeld;
     private static boolean nextTrackKeyHeld;
+    private static CModConfig modConfig = CModConfig.defaults();
     private static final KeyMapping.Category CUSTOM_KEY_CATEGORY = KeyMapping.Category.register(
             Identifier.fromNamespaceAndPath(MOD_ID, "newcustom_music_client_side_player")
     );
@@ -144,8 +146,17 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
                 }
         );
 
-        CModConfig modConfig = new CModConfigRepository().load();
+        modConfig = new CModConfigRepository().load();
         CUpdateChecker.initialize(modConfig.checkForUpdates());
+    }
+
+    public static CModConfig getModConfig() {
+        return modConfig;
+    }
+
+    public static void applyModConfig(CModConfig config) {
+        modConfig = Objects.requireNonNull(config, "config");
+        CUpdateChecker.applyCheckForUpdates(modConfig.checkForUpdates());
     }
 
     private static void showVolumeAdjustFeedback(Minecraft client, CPlaySoundController.VolumeAdjustResult result) {
