@@ -40,7 +40,7 @@ public final class CMainConfigScreen extends Screen {
     private static final Component TIPS_AND_TRICKS =
         Component.translatable("screen.custommusicclientsideplayer.tips.title");
 
-    private static final String SOURCE_URL = "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/tree/master";
+    private static final String SOURCE_URL = "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/tree/main";
     private static final String REPORT_BUGS_URL = "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/issues";
     private static final String MODRINTH_URL = "https://modrinth.com/mod/new-custom-music-client-side-player";
     private static final String GITHUB_URL = "https://github.com/8BitsOneByte";
