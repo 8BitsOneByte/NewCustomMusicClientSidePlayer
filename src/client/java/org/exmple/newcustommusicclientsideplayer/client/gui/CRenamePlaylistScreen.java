@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.function.Consumer;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -34,7 +33,7 @@ public final class CRenamePlaylistScreen extends Screen {
     private final Screen lastScreen;
     private final String originalName;
     private final Consumer<String> onRename;
-    private final Set<String> existingNamesLower = new HashSet<>();
+    private final Set<String> existingNames = new HashSet<>();
 
     @Nullable
     private EditBox nameEdit;
@@ -88,12 +87,10 @@ public final class CRenamePlaylistScreen extends Screen {
     }
 
     private void loadExistingNames() {
-        this.existingNamesLower.clear();
+        this.existingNames.clear();
         try {
             List<String> names = CPlaylistRepository.listPlaylistNames();
-            for (String name : names) {
-                this.existingNamesLower.add(name.toLowerCase(Locale.ROOT));
-            }
+            this.existingNames.addAll(names);
         } catch (IOException ignored) {
         }
     }
@@ -117,7 +114,7 @@ public final class CRenamePlaylistScreen extends Screen {
             return EMPTY_NAME_ERROR;
         }
 
-        if (this.existingNamesLower.contains(candidate.toLowerCase(Locale.ROOT))) {
+        if (this.existingNames.contains(candidate)) {
             return DUPLICATE_NAME_ERROR;
         }
 

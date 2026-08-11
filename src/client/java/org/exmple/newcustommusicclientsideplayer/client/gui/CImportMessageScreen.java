@@ -5,6 +5,7 @@ import java.util.Objects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractTextAreaWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.FittingMultiLineTextWidget;
 import net.minecraft.client.gui.components.ObjectSelectionList;
@@ -17,7 +18,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.FormattedCharSequence;
 import org.jspecify.annotations.Nullable;
 
-public final class CImportMessageScreen extends Screen {
+public class CImportMessageScreen extends Screen {
     private static final int MESSAGE_MARGIN = 100;
     private static final int MESSAGE_PADDING = 12;
     private static final int LAYOUT_SPACING = 8;
@@ -37,6 +38,8 @@ public final class CImportMessageScreen extends Screen {
     private final FrameLayout layout = new FrameLayout();
     private FittingMultiLineTextWidget messageWidget;
     private MessageLineList messageLineList;
+    private StringWidget subtitleWidget;
+    private Button primaryButtonWidget;
     private List<FormattedCharSequence> wrappedMessageLines = List.of();
 
     public CImportMessageScreen(
@@ -64,10 +67,20 @@ public final class CImportMessageScreen extends Screen {
     @Override
     protected void init() {
         this.layout.removeChildren();
+        this.messageWidget = null;
+        this.messageLineList = null;
+        this.subtitleWidget = null;
+        this.primaryButtonWidget = null;
 
         LinearLayout content = this.layout.addChild(LinearLayout.vertical().spacing(LAYOUT_SPACING));
         content.defaultCellSetting().alignHorizontallyCenter();
         content.addChild(new StringWidget(this.title, this.font));
+        Component subtitle = this.subtitle();
+        if (subtitle != null) {
+            this.subtitleWidget = content.addChild(
+                new StringWidget(subtitle, this.font).setMaxWidth(this.messageWidth())
+            );
+        }
 
         this.wrappedMessageLines = this.wrappedMessageLines();
         if (this.shouldScrollMessage()) {
@@ -94,10 +107,10 @@ public final class CImportMessageScreen extends Screen {
 
         LinearLayout buttonRow = content.addChild(LinearLayout.horizontal().spacing(BUTTON_SPACING));
         if (this.secondaryButton == null || this.secondaryAction == null) {
-            buttonRow.addChild(Button.builder(this.primaryButton, button -> this.primaryAction.run())
+            this.primaryButtonWidget = buttonRow.addChild(Button.builder(this.primaryButton, button -> this.primaryAction.run())
                 .build());
         } else {
-            buttonRow.addChild(Button.builder(this.primaryButton, button -> this.primaryAction.run())
+            this.primaryButtonWidget = buttonRow.addChild(Button.builder(this.primaryButton, button -> this.primaryAction.run())
                 .width(DOUBLE_BUTTON_WIDTH)
                 .build());
             buttonRow.addChild(Button.builder(this.secondaryButton, button -> this.secondaryAction.run())
@@ -107,6 +120,9 @@ public final class CImportMessageScreen extends Screen {
 
         this.layout.visitWidgets(this::addRenderableWidget);
         this.repositionElements();
+        if (this.focusPrimaryButtonOnInit() && this.primaryButtonWidget != null) {
+            this.setInitialFocus(this.primaryButtonWidget);
+        }
     }
 
     @Override
@@ -123,9 +139,25 @@ public final class CImportMessageScreen extends Screen {
         }
         this.layout.arrangeElements();
         FrameLayout.centerInRectangle(this.layout, this.getRectangle());
+        this.centerSubtitleWidget();
         if (this.messageLineList != null) {
             this.messageLineList.updateSize(this.messageWidth(), this.messageHeight());
         }
+    }
+
+    @Override
+    public void extractRenderState(
+        GuiGraphicsExtractor guiGraphics,
+        int mouseX,
+        int mouseY,
+        float partialTick
+    ) {
+        if (this.subtitleWidget != null) {
+            Component subtitle = this.subtitle();
+            this.subtitleWidget.setMessage(subtitle == null ? Component.empty() : subtitle);
+            this.centerSubtitleWidget();
+        }
+        super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     @Override
@@ -135,15 +167,40 @@ public final class CImportMessageScreen extends Screen {
         }
     }
 
+    /**
+     * Optional centered line between the title and message panel. Subclasses can return a dynamic
+     * component; it is refreshed before every render without changing the panel's line accounting.
+     */
+    @Nullable
+    protected Component subtitle() {
+        return null;
+    }
+
+    /**
+     * Warning screens can make their safe, left-hand action the initial keyboard focus while the
+     * existing import screens retain their current focus behavior.
+     */
+    protected boolean focusPrimaryButtonOnInit() {
+        return false;
+    }
+
     private int messageWidth() {
         return Math.max(DOUBLE_BUTTON_WIDTH, this.width - MESSAGE_MARGIN);
     }
 
     private int messageHeight() {
-        int visibleRows = this.shouldScrollMessage()
-            ? MAX_VISIBLE_LIST_ROWS
-            : Math.max(1, this.wrappedMessageLines.size());
-        return visibleRows * LIST_ROW_HEIGHT;
+        if (this.shouldScrollMessage()) {
+            return MAX_VISIBLE_LIST_ROWS * LIST_ROW_HEIGHT;
+        }
+
+        int visibleRows = Math.max(1, this.wrappedMessageLines.size());
+        return visibleRows * this.font.lineHeight + AbstractTextAreaWidget.DEFAULT_TOTAL_PADDING;
+    }
+
+    private void centerSubtitleWidget() {
+        if (this.subtitleWidget != null) {
+            this.subtitleWidget.setX((this.width - this.subtitleWidget.getWidth()) / 2);
+        }
     }
 
     private boolean shouldScrollMessage() {

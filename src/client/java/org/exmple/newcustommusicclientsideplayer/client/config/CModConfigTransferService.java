@@ -30,6 +30,7 @@ public final class CModConfigTransferService {
     private static final String CHECK_FOR_UPDATES_KEY = "checkForUpdates";
     private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
     private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
+    private static final String PLAYBACK_VOLUME_PERCENT_KEY = "playbackVolumePercent";
 
     public String defaultFileName() {
         return sanitizeFileName(modName()) + "-" + sanitizeFileName(modVersion()) + "-config.txt";
@@ -151,6 +152,17 @@ public final class CModConfigTransferService {
                 skippedFields.add(NOW_PLAYING_FEEDBACK_MODE_KEY);
             }
         }
+        if (configObject.has(PLAYBACK_VOLUME_PERCENT_KEY)) {
+            Integer playbackVolumePercent = readPlaybackVolumePercent(
+                configObject.get(PLAYBACK_VOLUME_PERCENT_KEY)
+            );
+            if (playbackVolumePercent != null) {
+                compatibleConfig = compatibleConfig.withPlaybackVolumePercent(playbackVolumePercent);
+                hasCompatibleSettings = true;
+            } else {
+                skippedFields.add(PLAYBACK_VOLUME_PERCENT_KEY);
+            }
+        }
 
         if (!hasCompatibleSettings) {
             throw CConfigImportException.noCompatibleSettings();
@@ -168,6 +180,20 @@ public final class CModConfigTransferService {
             try {
                 return CNowPlayingFeedbackMode.valueOf(primitive.getAsString());
             } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static Integer readPlaybackVolumePercent(JsonElement element) {
+        if (element instanceof JsonPrimitive primitive && primitive.isNumber()) {
+            try {
+                int playbackVolumePercent = primitive.getAsBigDecimal().intValueExact();
+                if (playbackVolumePercent >= CModConfig.MIN_PLAYBACK_VOLUME_PERCENT
+                    && playbackVolumePercent <= CModConfig.MAX_PLAYBACK_VOLUME_PERCENT) {
+                    return playbackVolumePercent;
+                }
+            } catch (ArithmeticException | NumberFormatException ignored) {
             }
         }
         return null;

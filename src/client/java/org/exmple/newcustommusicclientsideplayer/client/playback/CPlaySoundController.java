@@ -15,9 +15,9 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundSource;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
 import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedbackMode;
 import org.exmple.newcustommusicclientsideplayer.client.customnowplayingtoast.CCustomNowPlayingToast;
-import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaybackVolumeSettings;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
 import org.exmple.newcustommusicclientsideplayer.mixin.client.SoundEngineAccessor;
 import org.exmple.newcustommusicclientsideplayer.mixin.client.SoundManagerAccessor;
@@ -67,7 +67,7 @@ public final class CPlaySoundController {
     private static boolean musicVolumeLocked;
     private static double cachedMusicVolume;
     private static SessionMode lastSessionMode = SessionMode.NONE;
-    private static int playbackVolumePercent = 100;
+    private static int playbackVolumePercent = CModConfig.DEFAULT_PLAYBACK_VOLUME_PERCENT;
     private static boolean customPaused;
 
     private CPlaySoundController() {
@@ -99,24 +99,13 @@ public final class CPlaySoundController {
 
     public static VolumeAdjustResult adjustPlaybackVolume(int stepPercent) {
         int current = playbackVolumePercent;
-        int target = Math.max(0, Math.min(100, current + stepPercent));
+        int target = CModConfig.clampPlaybackVolumePercent(current + stepPercent);
 
         if (target == current) {
             return stepPercent < 0 ? VolumeAdjustResult.ALREADY_MUTED : VolumeAdjustResult.ALREADY_MAX;
         }
 
-        playbackVolumePercent = target;
-        try {
-            CPlaybackVolumeSettings.savePlaybackVolumePercent(playbackVolumePercent);
-        } catch (Exception ignored) {
-        }
-
-        CManagedSoundInstance managedSoundInstance = OWNED_SOUNDS.current();
-        if (managedSoundInstance != null) {
-            managedSoundInstance.setBaseVolume(playbackVolumePercent / 100.0F);
-            Minecraft.getInstance().getSoundManager().refreshCategoryVolume(SoundSource.MASTER);
-        }
-
+        setPlaybackVolumePercent(target);
         return VolumeAdjustResult.UPDATED;
     }
 
@@ -137,8 +126,18 @@ public final class CPlaySoundController {
         return Float.toString(clampedPitch);
     }
 
-    public static void loadPlaybackVolumePercent(int playbackVolumePercent) {
-        CPlaySoundController.playbackVolumePercent = Math.max(0, Math.min(100, playbackVolumePercent));
+    public static void setPlaybackVolumePercent(int playbackVolumePercent) {
+        int normalizedVolume = CModConfig.clampPlaybackVolumePercent(playbackVolumePercent);
+        if (CPlaySoundController.playbackVolumePercent == normalizedVolume) {
+            return;
+        }
+
+        CPlaySoundController.playbackVolumePercent = normalizedVolume;
+        CManagedSoundInstance managedSoundInstance = OWNED_SOUNDS.current();
+        if (managedSoundInstance != null) {
+            managedSoundInstance.setBaseVolume(normalizedVolume / 100.0F);
+            Minecraft.getInstance().getSoundManager().refreshCategoryVolume(SoundSource.MASTER);
+        }
     }
 
     public static SkipResult skipPlaylistBy(int offset) {

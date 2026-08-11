@@ -104,7 +104,7 @@ public final class CPlaylistImportWarningFormatter {
         for (CPlaylistImportPreview.Rename rename : preview.renamedPlaylists()) {
             MutableComponent item = Component.empty()
                 .append(playlistName(rename.originalName()))
-                .append(Component.literal(" -> ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal(" → ").withStyle(ChatFormatting.GRAY))
                 .append(playlistName(rename.importedName()));
             items.add(item);
         }

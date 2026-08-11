@@ -19,7 +19,6 @@ import org.lwjgl.glfw.GLFW;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigRepository;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
-import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaybackVolumeSettings;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPauseCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPlaySoundCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPlaylistCommand;
@@ -38,6 +37,7 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
     private static boolean previousTrackKeyHeld;
     private static boolean nextTrackKeyHeld;
     private static CModConfig modConfig = CModConfig.defaults();
+    private static boolean modConfigSavePending;
     private static final KeyMapping.Category CUSTOM_KEY_CATEGORY = KeyMapping.Category.register(
             Identifier.fromNamespaceAndPath(MOD_ID, "newcustom_music_client_side_player")
     );
@@ -74,7 +74,8 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
 
     @Override
     public void onInitializeClient() {
-        CPlaySoundController.loadPlaybackVolumePercent(CPlaybackVolumeSettings.loadPlaybackVolumePercent());
+        modConfig = new CModConfigRepository().load();
+        CPlaySoundController.setPlaybackVolumePercent(modConfig.playbackVolumePercent());
 
         KeyMappingHelper.registerKeyMapping(OPEN_PLAYLIST_CONFIG_KEY);
         KeyMappingHelper.registerKeyMapping(VOLUME_UP_KEY);
@@ -99,11 +100,21 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
             }
 
             while (VOLUME_UP_KEY.consumeClick()) {
-                showVolumeAdjustFeedback(client, CPlaySoundController.adjustPlaybackVolume(5));
+                if (client.gui.screen() == null) {
+                    showVolumeAdjustFeedback(
+                        client,
+                        adjustPlaybackVolume(CModConfig.PLAYBACK_VOLUME_SHORTCUT_STEP_PERCENT)
+                    );
+                }
             }
 
             while (VOLUME_DOWN_KEY.consumeClick()) {
-                showVolumeAdjustFeedback(client, CPlaySoundController.adjustPlaybackVolume(-5));
+                if (client.gui.screen() == null) {
+                    showVolumeAdjustFeedback(
+                        client,
+                        adjustPlaybackVolume(-CModConfig.PLAYBACK_VOLUME_SHORTCUT_STEP_PERCENT)
+                    );
+                }
             }
 
             while (TOGGLE_PAUSE_KEY.consumeClick()) {
@@ -130,9 +141,12 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             CFileDialogUtil.shutdown();
             CPlaySoundController.onClientStopping(client);
-            try {
-                CPlaybackVolumeSettings.savePlaybackVolumePercent(CPlaySoundController.getPlaybackVolumePercent());
-            } catch (Exception ignored) {
+            if (modConfigSavePending) {
+                try {
+                    new CModConfigRepository().save(modConfig);
+                    modConfigSavePending = false;
+                } catch (Exception ignored) {
+                }
             }
         });
 
@@ -146,7 +160,6 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
                 }
         );
 
-        modConfig = new CModConfigRepository().load();
         CUpdateChecker.initialize(modConfig.checkForUpdates());
     }
 
@@ -156,7 +169,25 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
 
     public static void applyModConfig(CModConfig config) {
         modConfig = Objects.requireNonNull(config, "config");
+        modConfigSavePending = false;
+        CPlaySoundController.setPlaybackVolumePercent(modConfig.playbackVolumePercent());
         CUpdateChecker.applyCheckForUpdates(modConfig.checkForUpdates());
+    }
+
+    private static CPlaySoundController.VolumeAdjustResult adjustPlaybackVolume(int stepPercent) {
+        CPlaySoundController.VolumeAdjustResult result = CPlaySoundController.adjustPlaybackVolume(stepPercent);
+        if (result != CPlaySoundController.VolumeAdjustResult.UPDATED) {
+            return result;
+        }
+
+        modConfig = modConfig.withPlaybackVolumePercent(CPlaySoundController.getPlaybackVolumePercent());
+        try {
+            new CModConfigRepository().save(modConfig);
+            modConfigSavePending = false;
+        } catch (Exception ignored) {
+            modConfigSavePending = true;
+        }
+        return result;
     }
 
     private static void showVolumeAdjustFeedback(Minecraft client, CPlaySoundController.VolumeAdjustResult result) {

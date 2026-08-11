@@ -23,8 +23,13 @@ public final class CModConfigRepository {
     private static final String CHECK_FOR_UPDATES_KEY = "checkForUpdates";
     private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
     private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
+    private static final String PLAYBACK_VOLUME_PERCENT_KEY = "playbackVolumePercent";
+    private static final String LEGACY_PLAYBACK_VOLUME_FILE_NAME = "playback_volume.json";
+    private static final String MIGRATED_PLAYBACK_VOLUME_FILE_NAME = "playback_volume.json.migrated";
 
     private final Path configPath;
+    private final Path legacyPlaybackVolumePath;
+    private final Path migratedPlaybackVolumePath;
 
     public CModConfigRepository() {
         this(FabricLoader.getInstance()
@@ -35,35 +40,74 @@ public final class CModConfigRepository {
 
     public CModConfigRepository(Path configPath) {
         this.configPath = Objects.requireNonNull(configPath, "configPath").toAbsolutePath().normalize();
+        this.legacyPlaybackVolumePath = this.configPath.resolveSibling(LEGACY_PLAYBACK_VOLUME_FILE_NAME);
+        this.migratedPlaybackVolumePath = this.configPath.resolveSibling(MIGRATED_PLAYBACK_VOLUME_FILE_NAME);
     }
 
     public CModConfig load() {
         if (!Files.isRegularFile(this.configPath)) {
-            return CModConfig.defaults();
+            return this.migrateLegacyVolumeWithoutConfig();
         }
 
+        JsonElement root;
         try (Reader reader = Files.newBufferedReader(this.configPath, StandardCharsets.UTF_8)) {
-            JsonElement root = JsonParser.parseReader(reader);
-            if (!(root instanceof JsonObject object)) {
-                return CModConfig.defaults();
-            }
-
-            return new CModConfig(
-                readBoolean(object, CHECK_FOR_UPDATES_KEY, CModConfig.DEFAULT_CHECK_FOR_UPDATES),
-                readBoolean(
-                    object,
-                    NOW_PLAYING_TOAST_ENABLED_KEY,
-                    CModConfig.DEFAULT_NOW_PLAYING_TOAST_ENABLED
-                ),
-                readNowPlayingFeedbackMode(
-                    object,
-                    NOW_PLAYING_FEEDBACK_MODE_KEY,
-                    CModConfig.DEFAULT_NOW_PLAYING_FEEDBACK_MODE
-                )
-            );
+            root = JsonParser.parseReader(reader);
         } catch (IOException | RuntimeException exception) {
-            return CModConfig.defaults();
+            return CModConfig.defaults().withPlaybackVolumePercent(this.readLegacyPlaybackVolume());
         }
+
+        if (!(root instanceof JsonObject object)) {
+            return CModConfig.defaults().withPlaybackVolumePercent(this.readLegacyPlaybackVolume());
+        }
+
+        boolean playbackVolumeMissing = !object.has(PLAYBACK_VOLUME_PERCENT_KEY);
+        Integer storedPlaybackVolume = playbackVolumeMissing
+            ? null
+            : readInteger(object, PLAYBACK_VOLUME_PERCENT_KEY);
+        int playbackVolumePercent = playbackVolumeMissing
+            ? this.readLegacyPlaybackVolume()
+            : storedPlaybackVolume == null
+                ? CModConfig.DEFAULT_PLAYBACK_VOLUME_PERCENT
+                : CModConfig.clampPlaybackVolumePercent(storedPlaybackVolume);
+        boolean normalizePlaybackVolume = storedPlaybackVolume != null
+            && storedPlaybackVolume != playbackVolumePercent;
+
+        CModConfig config = new CModConfig(
+            readBoolean(object, CHECK_FOR_UPDATES_KEY, CModConfig.DEFAULT_CHECK_FOR_UPDATES),
+            readBoolean(
+                object,
+                NOW_PLAYING_TOAST_ENABLED_KEY,
+                CModConfig.DEFAULT_NOW_PLAYING_TOAST_ENABLED
+            ),
+            readNowPlayingFeedbackMode(
+                object,
+                NOW_PLAYING_FEEDBACK_MODE_KEY,
+                CModConfig.DEFAULT_NOW_PLAYING_FEEDBACK_MODE
+            ),
+            playbackVolumePercent
+        );
+        boolean migrationSaved = this.migrateMissingFields(object, config, normalizePlaybackVolume);
+        if ((!playbackVolumeMissing && storedPlaybackVolume != null)
+            || (playbackVolumeMissing && migrationSaved)) {
+            this.retireLegacyPlaybackVolumeFile();
+        }
+        return config;
+    }
+
+    private CModConfig migrateLegacyVolumeWithoutConfig() {
+        CModConfig config = CModConfig.defaults();
+        if (!Files.isRegularFile(this.legacyPlaybackVolumePath)) {
+            return config;
+        }
+
+        config = config.withPlaybackVolumePercent(this.readLegacyPlaybackVolume());
+        try {
+            this.save(config);
+            this.retireLegacyPlaybackVolumeFile();
+        } catch (IOException | RuntimeException ignored) {
+            // The in-memory legacy value remains usable and migration will be retried next launch.
+        }
+        return config;
     }
 
     /**
@@ -74,6 +118,89 @@ public final class CModConfigRepository {
     public void save(CModConfig config) throws IOException {
         Objects.requireNonNull(config, "config");
 
+        JsonObject root = new JsonObject();
+        root.addProperty(CHECK_FOR_UPDATES_KEY, config.checkForUpdates());
+        root.addProperty(NOW_PLAYING_TOAST_ENABLED_KEY, config.nowPlayingToastEnabled());
+        root.addProperty(NOW_PLAYING_FEEDBACK_MODE_KEY, config.nowPlayingFeedbackMode().name());
+        root.addProperty(PLAYBACK_VOLUME_PERCENT_KEY, config.playbackVolumePercent());
+        this.writeConfiguration(root);
+    }
+
+    private boolean migrateMissingFields(
+        JsonObject root,
+        CModConfig config,
+        boolean normalizePlaybackVolume
+    ) {
+        boolean migrationNeeded = false;
+        if (!root.has(CHECK_FOR_UPDATES_KEY)) {
+            root.addProperty(CHECK_FOR_UPDATES_KEY, config.checkForUpdates());
+            migrationNeeded = true;
+        }
+        if (!root.has(NOW_PLAYING_TOAST_ENABLED_KEY)) {
+            root.addProperty(NOW_PLAYING_TOAST_ENABLED_KEY, config.nowPlayingToastEnabled());
+            migrationNeeded = true;
+        }
+        if (!root.has(NOW_PLAYING_FEEDBACK_MODE_KEY)) {
+            root.addProperty(NOW_PLAYING_FEEDBACK_MODE_KEY, config.nowPlayingFeedbackMode().name());
+            migrationNeeded = true;
+        }
+        if (!root.has(PLAYBACK_VOLUME_PERCENT_KEY) || normalizePlaybackVolume) {
+            root.addProperty(PLAYBACK_VOLUME_PERCENT_KEY, config.playbackVolumePercent());
+            migrationNeeded = true;
+        }
+        if (!migrationNeeded) {
+            return true;
+        }
+
+        try {
+            this.writeConfiguration(root);
+            return true;
+        } catch (IOException | RuntimeException ignored) {
+            // Migration is best-effort; the successfully loaded in-memory configuration remains usable.
+            return false;
+        }
+    }
+
+    private int readLegacyPlaybackVolume() {
+        if (!Files.isRegularFile(this.legacyPlaybackVolumePath)) {
+            return CModConfig.DEFAULT_PLAYBACK_VOLUME_PERCENT;
+        }
+
+        try (Reader reader = Files.newBufferedReader(this.legacyPlaybackVolumePath, StandardCharsets.UTF_8)) {
+            JsonElement root = JsonParser.parseReader(reader);
+            if (root instanceof JsonObject object) {
+                Integer storedVolume = readInteger(object, PLAYBACK_VOLUME_PERCENT_KEY);
+                if (storedVolume != null) {
+                    return CModConfig.clampPlaybackVolumePercent(storedVolume);
+                }
+            }
+        } catch (IOException | RuntimeException ignored) {
+        }
+        return CModConfig.DEFAULT_PLAYBACK_VOLUME_PERCENT;
+    }
+
+    private void retireLegacyPlaybackVolumeFile() {
+        if (!Files.isRegularFile(this.legacyPlaybackVolumePath)
+            || Files.exists(this.migratedPlaybackVolumePath)) {
+            return;
+        }
+
+        try {
+            Files.move(
+                this.legacyPlaybackVolumePath,
+                this.migratedPlaybackVolumePath,
+                StandardCopyOption.ATOMIC_MOVE
+            );
+        } catch (AtomicMoveNotSupportedException exception) {
+            try {
+                Files.move(this.legacyPlaybackVolumePath, this.migratedPlaybackVolumePath);
+            } catch (IOException ignored) {
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    private void writeConfiguration(JsonObject root) throws IOException {
         Path parent = this.configPath.getParent();
         if (parent == null) {
             throw new IOException("Configuration path has no parent directory: " + this.configPath);
@@ -83,10 +210,6 @@ public final class CModConfigRepository {
         Path temporaryPath = Files.createTempFile(parent, "config-", ".tmp");
         boolean replaced = false;
         try {
-            JsonObject root = new JsonObject();
-            root.addProperty(CHECK_FOR_UPDATES_KEY, config.checkForUpdates());
-            root.addProperty(NOW_PLAYING_TOAST_ENABLED_KEY, config.nowPlayingToastEnabled());
-            root.addProperty(NOW_PLAYING_FEEDBACK_MODE_KEY, config.nowPlayingFeedbackMode().name());
             try (Writer writer = Files.newBufferedWriter(temporaryPath, StandardCharsets.UTF_8)) {
                 GSON.toJson(root, writer);
             }
@@ -119,6 +242,17 @@ public final class CModConfigRepository {
             return primitive.getAsBoolean();
         }
         return defaultValue;
+    }
+
+    private static Integer readInteger(JsonObject object, String key) {
+        JsonElement element = object.get(key);
+        if (element instanceof JsonPrimitive primitive && primitive.isNumber()) {
+            try {
+                return primitive.getAsBigDecimal().intValueExact();
+            } catch (ArithmeticException | NumberFormatException ignored) {
+            }
+        }
+        return null;
     }
 
     private static CNowPlayingFeedbackMode readNowPlayingFeedbackMode(

@@ -5,15 +5,17 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.OptionInstance;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.ResettableOptionWidget;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.layouts.GridLayout;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
-import net.minecraft.client.gui.layouts.SpacerElement;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
@@ -22,6 +24,7 @@ import net.minecraft.resources.Identifier;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
 import org.exmple.newcustommusicclientsideplayer.client.config.CConfigImportException;
 import org.exmple.newcustommusicclientsideplayer.client.config.CConfigImportPreview;
+import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigEditSession;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigRepository;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigTransferService;
@@ -36,6 +39,8 @@ public final class CModConfigScreen extends Screen {
         Component.translatable("screen.custommusicclientsideplayer.mod_config.now_playing_toast");
     private static final Component NOW_PLAYING_FEEDBACK =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.now_playing_feedback");
+    private static final String PLAYBACK_VOLUME_KEY =
+        "screen.custommusicclientsideplayer.mod_config.playback_volume";
     private static final Component APPLY =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.apply");
     private static final Component IMPORT_CONFIG =
@@ -49,6 +54,10 @@ public final class CModConfigScreen extends Screen {
             .withStyle(ChatFormatting.RED);
     private static final Component DONE_UNSAVED_CHANGES =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.done_unsaved_changes");
+    private static final Component UNSAVED_CHANGES_TITLE =
+        Component.translatable("screen.custommusicclientsideplayer.unsaved_changes.title");
+    private static final Component UNSAVED_CHANGES_BODY =
+        Component.translatable("screen.custommusicclientsideplayer.unsaved_changes.body");
     private static final Component MUST_DISABLE_FULLSCREEN =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.must_disable_fullscreen");
     private static final Component IMPORT_DIALOG_TITLE =
@@ -112,6 +121,7 @@ public final class CModConfigScreen extends Screen {
     private final Screen parent;
     private final CModConfigRepository repository;
     private final CModConfigEditSession editSession;
+    private final OptionInstance<Integer> playbackVolumeOption;
     private final CModConfigTransferService transferService = new CModConfigTransferService();
     private final HeaderAndFooterLayout layout =
         new HeaderAndFooterLayout(this, HEADER_HEIGHT, FOOTER_HEIGHT);
@@ -120,6 +130,7 @@ public final class CModConfigScreen extends Screen {
     private CycleButton<Boolean> checkForUpdatesButton;
     private CycleButton<Boolean> nowPlayingToastButton;
     private CycleButton<CNowPlayingFeedbackMode> nowPlayingFeedbackButton;
+    private AbstractWidget playbackVolumeSlider;
     private Button importButton;
     private Button exportButton;
     private Button applyButton;
@@ -135,6 +146,17 @@ public final class CModConfigScreen extends Screen {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.editSession = new CModConfigEditSession(
             this.repository.load()
+        );
+        this.playbackVolumeOption = new OptionInstance<>(
+            PLAYBACK_VOLUME_KEY,
+            OptionInstance.noTooltip(),
+            (caption, value) -> Component.translatable("options.percent_value", caption, value),
+            new OptionInstance.IntRange(
+                CModConfig.MIN_PLAYBACK_VOLUME_PERCENT,
+                CModConfig.MAX_PLAYBACK_VOLUME_PERCENT
+            ),
+            this.editSession.draft().playbackVolumePercent(),
+            OptionInstance.NO_ACTION
         );
     }
 
@@ -183,7 +205,19 @@ public final class CModConfigScreen extends Screen {
                     }
                 )
         );
-        rows.addChild(SpacerElement.width(OPTION_WIDTH));
+        this.playbackVolumeSlider = rows.addChild(
+            this.playbackVolumeOption.createButton(
+                this.minecraft.options,
+                0,
+                0,
+                OPTION_WIDTH,
+                playbackVolumePercent -> {
+                    this.editSession.setPlaybackVolumePercent(playbackVolumePercent);
+                    this.clearSaveError();
+                    this.updateButtonStates();
+                }
+            )
+        );
         this.saveErrorWidget = rows.addChild(
             new StringWidget(CONTENT_WIDTH, this.font.lineHeight, Component.empty(), this.font),
             2
@@ -268,11 +302,34 @@ public final class CModConfigScreen extends Screen {
     }
 
     /**
-     * Back and Esc share this path: only draft changes since the last successful Apply are discarded,
-     * and neither persistence nor runtime application is performed. Done uses a separate clean-only
-     * path so it never repeats an already completed Apply operation while leaving the screen.
+     * Back and Esc share this path. A clean session leaves immediately, while a dirty session keeps
+     * this exact screen instance alive behind a discard warning so returning to edit cannot lose the
+     * draft. Done uses a separate clean-only path and never repeats a completed Apply operation.
      */
     private void onBack() {
+        if (this.editSession.isDirty()) {
+            this.openDiscardChangesWarning();
+            return;
+        }
+
+        this.returnToParent();
+    }
+
+    private void openDiscardChangesWarning() {
+        if (this.minecraft == null) {
+            return;
+        }
+
+        this.minecraft.gui.setScreen(new CDiscardChangesWarningScreen(
+            this,
+            UNSAVED_CHANGES_TITLE,
+            UNSAVED_CHANGES_BODY,
+            CConfigDiscardChangeFormatter.format(this.editSession.applied(), this.editSession.draft()),
+            this::discardDraftAndClose
+        ));
+    }
+
+    private void discardDraftAndClose() {
         this.editSession.discardDraft();
         this.returnToParent();
     }
@@ -347,7 +404,7 @@ public final class CModConfigScreen extends Screen {
             IMPORT_WARNING_BODY,
             IMPORT_WARNING_SKIPPED_FIELDS,
             preview.skippedFields().stream()
-                .map(field -> (Component) Component.literal(field))
+                .map(CModConfigScreen::skippedFieldLabel)
                 .toList(),
             IMPORT_CANCEL,
             () -> this.minecraft.gui.setScreen(this),
@@ -540,10 +597,24 @@ public final class CModConfigScreen extends Screen {
         if (this.nowPlayingFeedbackButton != null) {
             this.nowPlayingFeedbackButton.setValue(this.editSession.draft().nowPlayingFeedbackMode());
         }
+        this.playbackVolumeOption.set(this.editSession.draft().playbackVolumePercent());
+        if (this.playbackVolumeSlider instanceof ResettableOptionWidget resettableOptionWidget) {
+            resettableOptionWidget.resetValue();
+        }
     }
 
     private static String displayPath(Path path) {
         return path.toAbsolutePath().normalize().toString();
+    }
+
+    private static Component skippedFieldLabel(String field) {
+        return switch (field) {
+            case "checkForUpdates" -> CHECK_FOR_UPDATES;
+            case "nowPlayingToastEnabled" -> NOW_PLAYING_TOAST;
+            case "nowPlayingFeedbackMode" -> NOW_PLAYING_FEEDBACK;
+            case "playbackVolumePercent" -> Component.translatable(PLAYBACK_VOLUME_KEY);
+            default -> Component.literal(field);
+        };
     }
 
     private static Component feedbackModeLabel(CNowPlayingFeedbackMode mode) {

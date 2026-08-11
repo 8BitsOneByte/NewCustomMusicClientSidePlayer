@@ -9,8 +9,11 @@ import com.google.gson.JsonPrimitive;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.fabricmc.loader.api.FabricLoader;
@@ -28,6 +31,7 @@ public final class CTrackNameRepository {
         .resolve("track_names.json");
 
     private static Map<String, String> customNames;
+    private static IOException loadFailure;
 
     private CTrackNameRepository() {
     }
@@ -50,16 +54,48 @@ public final class CTrackNameRepository {
 
     public static synchronized void renameTrack(Identifier trackId, String newName) throws IOException {
         ensureLoaded();
+        throwIfLoadFailed();
 
+        LinkedHashMap<String, String> updatedNames = new LinkedHashMap<>(customNames);
         String normalized = newName.trim();
         String defaultName = getDefaultDisplayName(trackId);
         if (normalized.isEmpty() || normalized.equals(defaultName)) {
-            customNames.remove(trackId.toString());
+            updatedNames.remove(trackId.toString());
         } else {
-            customNames.put(trackId.toString(), normalized);
+            updatedNames.put(trackId.toString(), normalized);
         }
 
-        writeData();
+        writeData(updatedNames);
+        customNames = updatedNames;
+    }
+
+    public static synchronized Map<String, String> exportCustomNames() throws IOException {
+        ensureLoaded();
+        throwIfLoadFailed();
+        return new LinkedHashMap<>(customNames);
+    }
+
+    public static synchronized ImportResult importCustomNames(Map<Identifier, String> names) throws IOException {
+        ensureLoaded();
+        throwIfLoadFailed();
+
+        LinkedHashMap<String, String> updatedNames = new LinkedHashMap<>(customNames);
+        int changedCount = 0;
+        for (Map.Entry<Identifier, String> entry : names.entrySet()) {
+            String trackId = entry.getKey().toString();
+            String importedName = entry.getValue();
+            if (!importedName.equals(updatedNames.get(trackId))) {
+                updatedNames.put(trackId, importedName);
+                changedCount++;
+            }
+        }
+
+        if (changedCount > 0) {
+            writeData(updatedNames);
+            customNames = updatedNames;
+        }
+
+        return new ImportResult(changedCount);
     }
 
     private static void ensureLoaded() {
@@ -72,7 +108,7 @@ public final class CTrackNameRepository {
             return;
         }
 
-        try (Reader reader = Files.newBufferedReader(FILE_PATH)) {
+        try (Reader reader = Files.newBufferedReader(FILE_PATH, StandardCharsets.UTF_8)) {
             JsonElement root = JsonParser.parseReader(reader);
             if (!(root instanceof JsonObject rootObject)) {
                 return;
@@ -91,24 +127,50 @@ public final class CTrackNameRepository {
                     }
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
             customNames = new LinkedHashMap<>();
+            loadFailure = new IOException("Could not read track name data.", exception);
         }
     }
 
-    private static void writeData() throws IOException {
+    private static void throwIfLoadFailed() throws IOException {
+        if (loadFailure != null) {
+            throw loadFailure;
+        }
+    }
+
+    private static void writeData(Map<String, String> names) throws IOException {
         Files.createDirectories(FILE_PATH.getParent());
 
         JsonObject root = new JsonObject();
         JsonObject namesObject = new JsonObject();
-        for (Map.Entry<String, String> entry : customNames.entrySet()) {
+        for (Map.Entry<String, String> entry : names.entrySet()) {
             namesObject.addProperty(entry.getKey(), entry.getValue());
         }
 
         root.add("trackNames", namesObject);
-        try (Writer writer = Files.newBufferedWriter(FILE_PATH)) {
-            GSON.toJson(root, writer);
+        Path temporaryFile = Files.createTempFile(FILE_PATH.getParent(), "track_names-", ".tmp");
+        try {
+            try (Writer writer = Files.newBufferedWriter(temporaryFile, StandardCharsets.UTF_8)) {
+                GSON.toJson(root, writer);
+            }
+
+            try {
+                Files.move(
+                    temporaryFile,
+                    FILE_PATH,
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING
+                );
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(temporaryFile, FILE_PATH, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporaryFile);
         }
+    }
+
+    public record ImportResult(int changedCount) {
     }
 }
 

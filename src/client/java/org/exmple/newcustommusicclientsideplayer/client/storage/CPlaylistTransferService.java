@@ -174,10 +174,7 @@ public final class CPlaylistTransferService {
 
     private static CPlaylistImportPreview scanPlaylists(List<RawPlaylistEntry> playlistEntries) throws CPlaylistImportException {
         List<String> existingNames = readExistingPlaylistNames();
-        Set<String> occupiedNamesLower = new HashSet<>();
-        for (String existingName : existingNames) {
-            occupiedNamesLower.add(existingName.toLowerCase(Locale.ROOT));
-        }
+        Set<String> occupiedNames = new HashSet<>(existingNames);
 
         List<CPlaylistImportPreview.PlaylistToImport> playlists = new ArrayList<>();
         List<String> skippedPlaylistEntries = new ArrayList<>();
@@ -195,8 +192,8 @@ public final class CPlaylistTransferService {
                 continue;
             }
 
-            String importName = uniquePlaylistName(originalName, occupiedNamesLower);
-            occupiedNamesLower.add(importName.toLowerCase(Locale.ROOT));
+            String importName = uniquePlaylistName(originalName, occupiedNames);
+            occupiedNames.add(importName);
             if (!importName.equals(originalName)) {
                 renamedPlaylists.add(new CPlaylistImportPreview.Rename(originalName, importName));
             }
@@ -320,8 +317,8 @@ public final class CPlaylistTransferService {
         return name.length() > MAX_PLAYLIST_NAME_LENGTH ? null : name;
     }
 
-    private static String uniquePlaylistName(String originalName, Set<String> occupiedNamesLower) {
-        if (!occupiedNamesLower.contains(originalName.toLowerCase(Locale.ROOT))) {
+    private static String uniquePlaylistName(String originalName, Set<String> occupiedNames) {
+        if (!occupiedNames.contains(originalName)) {
             return originalName;
         }
 
@@ -329,7 +326,7 @@ public final class CPlaylistTransferService {
             String suffixText = "(" + suffix + ")";
             int baseLength = Math.min(originalName.length(), MAX_PLAYLIST_NAME_LENGTH - suffixText.length());
             String candidate = originalName.substring(0, baseLength) + suffixText;
-            if (!occupiedNamesLower.contains(candidate.toLowerCase(Locale.ROOT))) {
+            if (!occupiedNames.contains(candidate)) {
                 return candidate;
             }
         }

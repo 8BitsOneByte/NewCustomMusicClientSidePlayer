@@ -3,7 +3,6 @@ package org.exmple.newcustommusicclientsideplayer.client.gui;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -28,7 +27,7 @@ public final class CCreatePlaylistScreen extends Screen {
 
     private final Screen lastScreen;
     private final Runnable onCreated;
-    private final Set<String> existingNamesLower = new HashSet<>();
+    private final Set<String> existingNames = new HashSet<>();
 
     private EditBox nameEdit;
     private Button createButton;
@@ -77,12 +76,10 @@ public final class CCreatePlaylistScreen extends Screen {
     }
 
     private void loadExistingNames() {
-        this.existingNamesLower.clear();
+        this.existingNames.clear();
         try {
             List<String> names = CPlaylistRepository.listPlaylistNames();
-            for (String name : names) {
-                this.existingNamesLower.add(name.toLowerCase(Locale.ROOT));
-            }
+            this.existingNames.addAll(names);
         } catch (IOException ignored) {
         }
     }
@@ -100,7 +97,7 @@ public final class CCreatePlaylistScreen extends Screen {
             return EMPTY_NAME_ERROR;
         }
 
-        if (this.existingNamesLower.contains(candidate.toLowerCase(Locale.ROOT))) {
+        if (this.existingNames.contains(candidate)) {
             return DUPLICATE_NAME_ERROR;
         }
 

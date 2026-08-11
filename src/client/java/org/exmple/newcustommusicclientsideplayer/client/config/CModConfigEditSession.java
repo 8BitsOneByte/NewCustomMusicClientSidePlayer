@@ -35,6 +35,10 @@ public final class CModConfigEditSession {
         this.draft = this.draft.withNowPlayingFeedbackMode(mode);
     }
 
+    public void setPlaybackVolumePercent(int playbackVolumePercent) {
+        this.draft = this.draft.withPlaybackVolumePercent(playbackVolumePercent);
+    }
+
     /**
      * Replaces only the editable draft. Import flows use this to preview imported values without
      * changing the clean applied baseline or saving to disk.

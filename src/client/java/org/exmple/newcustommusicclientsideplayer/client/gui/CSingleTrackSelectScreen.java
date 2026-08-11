@@ -1,5 +1,7 @@
 package org.exmple.newcustommusicclientsideplayer.client.gui;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -12,8 +14,11 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.layouts.GridLayout;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
+import net.minecraft.client.gui.layouts.SpacerElement;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -28,30 +33,71 @@ import org.exmple.newcustommusicclientsideplayer.client.gui.component.CDropdownG
 import org.exmple.newcustommusicclientsideplayer.client.gui.component.CDropdownScreenCoordinator;
 import org.exmple.newcustommusicclientsideplayer.client.gui.component.CDropdownSelector;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameImportException;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameImportPreview;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameTransferService;
 
 public final class CSingleTrackSelectScreen extends Screen {
     private static final int LIST_WIDTH = 200;
     private static final int LIST_ROW_HEIGHT = 36;
-    private static final int LIST_TOP_PADDING = 2;
     private static final int HEADER_ITEM_SPACING = 4;
     private static final int HEADER_VERTICAL_PADDING = 4;
-    private static final int SEARCH_BOX_MIN_HEIGHT = 20;
-    private static final int SEARCH_BOX_MAX_HEIGHT = LIST_ROW_HEIGHT * 2 / 3;
+    private static final int SEARCH_BOX_HEIGHT = 20;
     private static final int NAMESPACE_SELECTOR_HEIGHT = 20;
     private static final int MAX_VISIBLE_NAMESPACES = 6;
-    private static final int FOOTER_HEIGHT = 36;
+    private static final int FOOTER_HEIGHT = 60;
     private static final int COLOR_TEXT_WHITE = -1;
     private static final int COLOR_TEXT_GRAY = -8355712;
-    private static final int FOOTER_BUTTON_WIDTH = 120;
+    private static final int FOOTER_BUTTON_WIDTH = 150;
+    private static final int FOOTER_COLUMN_SPACING = 8;
+    private static final int FOOTER_ROW_SPACING = 4;
+    private static final int TRANSFER_BUTTON_SIZE = 20;
+    private static final int TRANSFER_BUTTON_OFFSET = 8;
+    private static final int TRANSFER_ROW_SPACING = 4;
+    private static final int TRANSFER_BUTTON_BALANCE_WIDTH =
+        TRANSFER_BUTTON_OFFSET + TRANSFER_BUTTON_SIZE * 2 + TRANSFER_ROW_SPACING * 2;
     private static final Component TITLE = Component.translatable("screen.custommusicclientsideplayer.singletrack.title");
     private static final Component SEARCH_HINT = Component.translatable("screen.custommusicclientsideplayer.playlist_editor.search_sound_id").withStyle(EditBox.SEARCH_HINT_STYLE);
     private static final Component PLAY_SELECTED_TEXT = Component.translatable("screen.custommusicclientsideplayer.singletrack.play_selected");
     private static final Component RENAME_TRACK_TEXT = Component.translatable("screen.custommusicclientsideplayer.rename_track.button");
+    private static final Component RESTORE_TRACK_NAME_TEXT = Component.translatable("screen.custommusicclientsideplayer.restore_track_name.button");
+    private static final Component RESTORE_TRACK_NAME_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.restore_track_name.tooltip");
+    private static final Component RESTORE_TRACK_NAME_FAILED = Component.translatable("screen.custommusicclientsideplayer.error.restore_track_name_failed");
+    private static final Component IMPORT_TRACK_NAMES_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_tooltip");
+    private static final Component EXPORT_TRACK_NAMES_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.export_tooltip");
+    private static final Component MUST_DISABLE_FULLSCREEN = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.must_disable_fullscreen");
+    private static final Component IMPORT_DIALOG_TITLE = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_dialog_title");
+    private static final Component IMPORT_DIALOG_FILTER = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_dialog_filter");
+    private static final Component EXPORT_DIALOG_TITLE = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.export_dialog_title");
+    private static final Component EXPORT_DIALOG_FILTER = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.export_dialog_filter");
+    private static final Component IMPORT_SUCCESS_TOAST_TITLE = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.toast.import_success.title");
+    private static final String IMPORT_SUCCESS_TOAST_DESCRIPTION_KEY = "screen.custommusicclientsideplayer.track_name_transfer.toast.import_success.description";
+    private static final Component EXPORT_SUCCESS_TOAST_TITLE = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.toast.export_success.title");
+    private static final String EXPORT_SUCCESS_TOAST_DESCRIPTION_KEY = "screen.custommusicclientsideplayer.track_name_transfer.toast.export_success.description";
+    private static final Component EXPORT_FAILED_TOAST_TITLE = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.toast.export_failed.title");
+    private static final String EXPORT_FAILED_TOAST_DESCRIPTION_KEY = "screen.custommusicclientsideplayer.track_name_transfer.toast.export_failed.description";
+    private static final String EXPORT_DIALOG_FAILED_TOAST_DESCRIPTION_KEY = "screen.custommusicclientsideplayer.track_name_transfer.toast.export_dialog_failed.description";
+    private static final Component IMPORT_BACK = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_back");
+    private static final Component IMPORT_CANCEL = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_cancel");
+    private static final Component IMPORT_IO_ERROR_TITLE = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_io_error.title");
+    private static final Component IMPORT_IO_ERROR_BODY = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_io_error.body");
+    private static final Component IMPORT_INVALID_TITLE = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_invalid.title");
+    private static final Component IMPORT_INVALID_BODY = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_invalid.body");
+    private static final Component IMPORT_NO_COMPATIBLE_TITLE = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_no_compatible.title");
+    private static final Component IMPORT_NO_COMPATIBLE_BODY = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_no_compatible.body");
+    private static final Component IMPORT_WARNING_TITLE = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_warning.title");
+    private static final Component IMPORT_WARNING_BODY = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_warning.body");
+    private static final Component IMPORT_WARNING_CONFIRM = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_warning.confirm");
+    private static final Component IMPORT_SAVE_FAILED_TITLE = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_save_failed.title");
+    private static final Component IMPORT_SAVE_FAILED_BODY = Component.translatable("screen.custommusicclientsideplayer.track_name_transfer.import_save_failed.body");
     private static final Identifier MC_MUS_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/mc_mus_icon.png");
     private static final Identifier OTHER_MUS_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/other_mus_icon.png");
+    private static final Identifier IMPORT_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/import.png");
+    private static final Identifier EXPORT_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/export.png");
 
     private final Screen parent;
+    private final CTrackNameTransferService transferService = new CTrackNameTransferService();
     private final HeaderAndFooterLayout layout =
         new HeaderAndFooterLayout(this, 0, FOOTER_HEIGHT);
     private final CDropdownScreenCoordinator dropdownCoordinator =
@@ -63,10 +109,11 @@ public final class CSingleTrackSelectScreen extends Screen {
     private SoundSelectionList soundSelectionList;
     private CDropdownSelector<String> namespaceSelector;
     private EditBox searchBox;
+    private Button importButton;
+    private Button exportButton;
     private Button playSelectedTrackButton;
     private Button renameTrackButton;
-    private int searchBoxHeight = SEARCH_BOX_MIN_HEIGHT;
-    private boolean alignListToCompleteRows = true;
+    private Button restoreTrackNameButton;
     private String filter = "";
 
     public CSingleTrackSelectScreen(Screen parent) {
@@ -102,13 +149,18 @@ public final class CSingleTrackSelectScreen extends Screen {
                 )
             )
         );
-        this.searchBox = header.addChild(
+        LinearLayout searchRow = header.addChild(
+            LinearLayout.horizontal().spacing(TRANSFER_ROW_SPACING)
+        );
+        searchRow.defaultCellSetting().alignVerticallyMiddle();
+        searchRow.addChild(SpacerElement.width(TRANSFER_BUTTON_BALANCE_WIDTH));
+        this.searchBox = searchRow.addChild(
             new EditBox(
                 this.font,
                 0,
                 0,
                 LIST_WIDTH,
-                this.searchBoxHeight,
+                SEARCH_BOX_HEIGHT,
                 Component.empty()
             )
         );
@@ -118,26 +170,47 @@ public final class CSingleTrackSelectScreen extends Screen {
             this.filter = value;
             this.refreshVisibleEntries();
         });
+        searchRow.addChild(SpacerElement.width(TRANSFER_BUTTON_OFFSET));
+        this.importButton = searchRow.addChild(
+            Button.builder(Component.empty(), ignoredButton -> this.onImportTrackNames())
+                .width(TRANSFER_BUTTON_SIZE)
+                .tooltip(Tooltip.create(IMPORT_TRACK_NAMES_TOOLTIP))
+                .build()
+        );
+        this.exportButton = searchRow.addChild(
+            Button.builder(Component.empty(), ignoredButton -> this.onExportTrackNames())
+                .width(TRANSFER_BUTTON_SIZE)
+                .tooltip(Tooltip.create(EXPORT_TRACK_NAMES_TOOLTIP))
+                .build()
+        );
 
         this.soundSelectionList = this.layout.addToContents(new SoundSelectionList(this.minecraft, this, this.width, this.layout.getContentHeight()));
 
-        LinearLayout footer = this.layout.addToFooter(
-            LinearLayout.horizontal().spacing(8)
+        GridLayout footer = this.layout.addToFooter(
+            new GridLayout().columnSpacing(FOOTER_COLUMN_SPACING).rowSpacing(FOOTER_ROW_SPACING)
         );
         footer.defaultCellSetting().alignHorizontallyCenter();
-        this.playSelectedTrackButton = footer.addChild(
+        GridLayout.RowHelper footerRows = footer.createRowHelper(2);
+        this.playSelectedTrackButton = footerRows.addChild(
             Button.builder(
                 PLAY_SELECTED_TEXT,
                 ignoredButton -> this.onPlaySelectedTrack()
             ).width(FOOTER_BUTTON_WIDTH).build()
         );
-        this.renameTrackButton = footer.addChild(
+        this.renameTrackButton = footerRows.addChild(
             Button.builder(
                 RENAME_TRACK_TEXT,
                 ignoredButton -> this.onRenameSelectedTrack()
             ).width(FOOTER_BUTTON_WIDTH).build()
         );
-        footer.addChild(
+        this.restoreTrackNameButton = footerRows.addChild(
+            Button.builder(
+                RESTORE_TRACK_NAME_TEXT,
+                ignoredButton -> this.onRestoreSelectedTrackName()
+            ).width(FOOTER_BUTTON_WIDTH)
+                .build()
+        );
+        footerRows.addChild(
             Button.builder(
                 CommonComponents.GUI_BACK,
                 ignoredButton -> this.onClose()
@@ -173,6 +246,7 @@ public final class CSingleTrackSelectScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        this.updateButtonStates();
         boolean mouseCoveredByDropdown =
             this.dropdownCoordinator.isMouseOverExpandedOverlay(mouseX, mouseY);
         super.extractRenderState(
@@ -181,6 +255,8 @@ public final class CSingleTrackSelectScreen extends Screen {
             mouseCoveredByDropdown ? Integer.MIN_VALUE : mouseY,
             partialTick
         );
+        this.extractTransferButtonIcon(guiGraphics, this.importButton, IMPORT_ICON);
+        this.extractTransferButtonIcon(guiGraphics, this.exportButton, EXPORT_ICON);
         this.dropdownCoordinator.extractOverlays(
             guiGraphics,
             mouseX,
@@ -247,51 +323,15 @@ public final class CSingleTrackSelectScreen extends Screen {
         super.removed();
     }
 
-    /**
-     * Absorbs the viewport remainder into the search box while that box remains
-     * no taller than two thirds of one sound row. Once the maximum is reached,
-     * the header is clamped and the list receives the remaining height even
-     * when it cannot end on a complete row. This prevents small scaled
-     * viewports from turning the search field into the dominant part of the
-     * screen.
-     */
     private void updateHeaderMetrics() {
-        int fixedHeaderHeight = HEADER_VERTICAL_PADDING * 2
+        int headerHeight = HEADER_VERTICAL_PADDING * 2
             + this.font.lineHeight
             + NAMESPACE_SELECTOR_HEIGHT
+            + SEARCH_BOX_HEIGHT
             + HEADER_ITEM_SPACING * 2;
-        int minimumHeaderHeight = fixedHeaderHeight
-            + SEARCH_BOX_MIN_HEIGHT;
-        int completeRows = Math.max(
-            1,
-            (
-                this.height
-                    - FOOTER_HEIGHT
-                    - minimumHeaderHeight
-                    - LIST_TOP_PADDING
-            ) / LIST_ROW_HEIGHT
-        );
-        int completeListHeight = LIST_TOP_PADDING
-            + completeRows * LIST_ROW_HEIGHT;
-        int headerHeight = Math.max(
-            minimumHeaderHeight,
-            this.height - FOOTER_HEIGHT - completeListHeight
-        );
-        int idealSearchBoxHeight = Math.max(
-            SEARCH_BOX_MIN_HEIGHT,
-            headerHeight - fixedHeaderHeight
-        );
-
-        this.searchBoxHeight = Math.min(
-            idealSearchBoxHeight,
-            SEARCH_BOX_MAX_HEIGHT
-        );
-        this.alignListToCompleteRows =
-            idealSearchBoxHeight <= SEARCH_BOX_MAX_HEIGHT;
-        headerHeight = fixedHeaderHeight + this.searchBoxHeight;
         this.layout.setHeaderHeight(headerHeight);
         if (this.searchBox != null) {
-            this.searchBox.setHeight(this.searchBoxHeight);
+            this.searchBox.setHeight(SEARCH_BOX_HEIGHT);
         }
     }
 
@@ -349,7 +389,19 @@ public final class CSingleTrackSelectScreen extends Screen {
     }
 
     private void updateButtonStates() {
-        boolean hasSelection = this.getSelectedSound() != null;
+        Identifier selectedTrack = this.getSelectedSound();
+        boolean hasSelection = selectedTrack != null;
+        boolean hasCustomName = hasSelection && CTrackNameRepository.getCustomName(selectedTrack) != null;
+        boolean fullscreen = this.minecraft != null && this.minecraft.getWindow().isFullscreen();
+        Tooltip fullscreenTooltip = fullscreen ? Tooltip.create(MUST_DISABLE_FULLSCREEN) : null;
+        if (this.importButton != null) {
+            this.importButton.active = !fullscreen;
+            this.importButton.setTooltip(fullscreen ? fullscreenTooltip : Tooltip.create(IMPORT_TRACK_NAMES_TOOLTIP));
+        }
+        if (this.exportButton != null) {
+            this.exportButton.active = !fullscreen;
+            this.exportButton.setTooltip(fullscreen ? fullscreenTooltip : Tooltip.create(EXPORT_TRACK_NAMES_TOOLTIP));
+        }
         if (this.playSelectedTrackButton != null) {
             this.playSelectedTrackButton.active = hasSelection;
         }
@@ -357,6 +409,233 @@ public final class CSingleTrackSelectScreen extends Screen {
         if (this.renameTrackButton != null) {
             this.renameTrackButton.active = hasSelection;
         }
+        if (this.restoreTrackNameButton != null) {
+            this.restoreTrackNameButton.active = hasCustomName;
+            this.restoreTrackNameButton.setTooltip(
+                hasCustomName ? Tooltip.create(RESTORE_TRACK_NAME_TOOLTIP) : null
+            );
+        }
+    }
+
+    private void extractTransferButtonIcon(GuiGraphicsExtractor guiGraphics, Button button, Identifier icon) {
+        if (button == null || !button.visible) {
+            return;
+        }
+
+        int iconSize = 16;
+        int iconX = button.getX() + (button.getWidth() - iconSize) / 2;
+        int iconY = button.getY() + (button.getHeight() - iconSize) / 2;
+        guiGraphics.blit(
+            RenderPipelines.GUI_TEXTURED,
+            icon,
+            iconX,
+            iconY,
+            0.0F,
+            0.0F,
+            iconSize,
+            iconSize,
+            32,
+            32,
+            32,
+            32
+        );
+        if (!button.active) {
+            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0x99000000);
+        }
+    }
+
+    private void onImportTrackNames() {
+        if (this.minecraft == null || this.minecraft.getWindow().isFullscreen()) {
+            return;
+        }
+
+        CFileDialogUtil.fileSelectDialog(
+            CFileDialogUtil.DialogType.OPEN,
+            IMPORT_DIALOG_TITLE.getString(),
+            null,
+            IMPORT_DIALOG_FILTER.getString(),
+            "*.txt"
+        ).whenComplete((selectedPath, throwable) -> this.minecraft.execute(() -> {
+            if (this.minecraft.gui.screen() != this) {
+                return;
+            }
+            if (throwable != null) {
+                this.openImportMessageScreen(IMPORT_IO_ERROR_TITLE, IMPORT_IO_ERROR_BODY, List.of());
+                return;
+            }
+            selectedPath.ifPresent(this::handleImportPath);
+        }));
+    }
+
+    private void handleImportPath(Path path) {
+        CTrackNameImportPreview preview;
+        try {
+            preview = this.transferService.previewImport(path, this.allSounds);
+        } catch (CTrackNameImportException exception) {
+            this.openImportExceptionScreen(exception);
+            return;
+        }
+
+        if (!preview.hasCompatibleNames()) {
+            this.openImportMessageScreen(
+                IMPORT_NO_COMPATIBLE_TITLE,
+                IMPORT_NO_COMPATIBLE_BODY,
+                CTrackNameImportWarningFormatter.format(preview)
+            );
+            return;
+        }
+        if (preview.hasWarnings()) {
+            this.openImportWarningScreen(preview);
+            return;
+        }
+
+        this.applyImportPreview(preview);
+    }
+
+    private boolean applyImportPreview(CTrackNameImportPreview preview) {
+        try {
+            CTrackNameRepository.ImportResult result = this.transferService.importPreview(preview);
+            this.refreshVisibleEntries();
+            this.showImportSuccess(result.changedCount());
+            return true;
+        } catch (IOException | RuntimeException exception) {
+            this.openImportMessageScreen(IMPORT_SAVE_FAILED_TITLE, IMPORT_SAVE_FAILED_BODY, List.of());
+            return false;
+        }
+    }
+
+    private void onExportTrackNames() {
+        if (this.minecraft == null || this.minecraft.getWindow().isFullscreen()) {
+            return;
+        }
+
+        CFileDialogUtil.fileSelectDialog(
+            CFileDialogUtil.DialogType.SAVE,
+            EXPORT_DIALOG_TITLE.getString(),
+            Path.of(this.transferService.defaultFileName()),
+            EXPORT_DIALOG_FILTER.getString(),
+            "*.txt"
+        ).whenComplete((selectedPath, throwable) -> this.minecraft.execute(() -> {
+            if (this.minecraft.gui.screen() != this) {
+                return;
+            }
+            if (throwable != null) {
+                this.showExportDialogError();
+                return;
+            }
+            selectedPath.ifPresent(this::handleExportPath);
+        }));
+    }
+
+    private void handleExportPath(Path path) {
+        try {
+            this.transferService.exportTrackNames(path);
+        } catch (IOException | RuntimeException exception) {
+            this.showExportError(path);
+            return;
+        }
+
+        this.showExportSuccess(path);
+        this.updateButtonStates();
+    }
+
+    private void openImportExceptionScreen(CTrackNameImportException exception) {
+        switch (exception.reason()) {
+            case IO_ERROR -> this.openImportMessageScreen(IMPORT_IO_ERROR_TITLE, IMPORT_IO_ERROR_BODY, List.of());
+            case INVALID_TRACK_NAME_FILE -> this.openImportMessageScreen(
+                IMPORT_INVALID_TITLE,
+                IMPORT_INVALID_BODY,
+                List.of()
+            );
+        }
+    }
+
+    private void openImportMessageScreen(Component title, Component body, List<Component> items) {
+        if (this.minecraft == null) {
+            return;
+        }
+        this.minecraft.gui.setScreen(new CImportMessageScreen(
+            this,
+            title,
+            body,
+            null,
+            items,
+            IMPORT_BACK,
+            () -> this.minecraft.gui.setScreen(this),
+            null,
+            null
+        ));
+    }
+
+    private void openImportWarningScreen(CTrackNameImportPreview preview) {
+        if (this.minecraft == null) {
+            return;
+        }
+        this.minecraft.gui.setScreen(new CImportMessageScreen(
+            this,
+            IMPORT_WARNING_TITLE,
+            IMPORT_WARNING_BODY,
+            null,
+            CTrackNameImportWarningFormatter.format(preview),
+            IMPORT_CANCEL,
+            () -> this.minecraft.gui.setScreen(this),
+            IMPORT_WARNING_CONFIRM,
+            () -> {
+                if (this.applyImportPreview(preview)) {
+                    this.minecraft.gui.setScreen(this);
+                }
+            }
+        ));
+    }
+
+    private void showImportSuccess(int importedCount) {
+        if (this.minecraft != null) {
+            CTransferToast.show(
+                this.minecraft,
+                CTransferToast.Kind.SUCCESS,
+                IMPORT_SUCCESS_TOAST_TITLE,
+                Component.translatable(IMPORT_SUCCESS_TOAST_DESCRIPTION_KEY, importedCount)
+            );
+        }
+    }
+
+    private void showExportSuccess(Path path) {
+        if (this.minecraft != null) {
+            CTransferToast.show(
+                this.minecraft,
+                CTransferToast.Kind.SUCCESS,
+                EXPORT_SUCCESS_TOAST_TITLE,
+                Component.translatable(EXPORT_SUCCESS_TOAST_DESCRIPTION_KEY, displayPath(path))
+            );
+        }
+    }
+
+    private void showExportError(Path path) {
+        if (this.minecraft != null) {
+            CTransferToast.show(
+                this.minecraft,
+                CTransferToast.Kind.FAILURE,
+                EXPORT_FAILED_TOAST_TITLE,
+                Component.translatable(EXPORT_FAILED_TOAST_DESCRIPTION_KEY, displayPath(path))
+            );
+        }
+        this.updateButtonStates();
+    }
+
+    private void showExportDialogError() {
+        if (this.minecraft != null) {
+            CTransferToast.show(
+                this.minecraft,
+                CTransferToast.Kind.FAILURE,
+                EXPORT_FAILED_TOAST_TITLE,
+                Component.translatable(EXPORT_DIALOG_FAILED_TOAST_DESCRIPTION_KEY)
+            );
+        }
+        this.updateButtonStates();
+    }
+
+    private static String displayPath(Path path) {
+        return path.toAbsolutePath().normalize().toString();
     }
 
     private Identifier getSelectedSound() {
@@ -410,6 +689,25 @@ public final class CSingleTrackSelectScreen extends Screen {
         this.minecraft.gui.setScreen(new CRenameTrackScreen(this, selected, sameNamespaceTracks, this::refreshVisibleEntries));
     }
 
+    private void onRestoreSelectedTrackName() {
+        Identifier selected = this.getSelectedSound();
+        if (selected == null || CTrackNameRepository.getCustomName(selected) == null) {
+            return;
+        }
+
+        try {
+            CTrackNameRepository.renameTrack(
+                selected,
+                CTrackNameRepository.getDefaultDisplayName(selected)
+            );
+            this.refreshVisibleEntries();
+        } catch (IOException | RuntimeException exception) {
+            if (this.minecraft.player != null) {
+                this.minecraft.player.sendSystemMessage(RESTORE_TRACK_NAME_FAILED);
+            }
+        }
+    }
+
     private void playUiClickSound() {
         this.minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
     }
@@ -424,36 +722,14 @@ public final class CSingleTrackSelectScreen extends Screen {
             this.centerListVertically = false;
         }
 
-        /**
-         * Uses complete rows while the header can absorb the viewport remainder.
-         * If the search box has reached its height cap, the list instead fills
-         * all remaining space so preserving complete rows cannot enlarge the
-         * search box beyond that cap.
-         */
         @Override
         public void updateSize(int width, HeaderAndFooterLayout layout) {
-            int availableHeight = layout.getContentHeight();
-            if (!CSingleTrackSelectScreen.this.alignListToCompleteRows) {
-                this.updateSizeAndPosition(
-                    width,
-                    availableHeight,
-                    0,
-                    layout.getHeaderHeight()
-                );
-                return;
-            }
-
-            int completeRows = Math.max(
-                1,
-                (availableHeight - LIST_TOP_PADDING) / LIST_ROW_HEIGHT
+            this.updateSizeAndPosition(
+                width,
+                layout.getContentHeight(),
+                0,
+                layout.getHeaderHeight()
             );
-            int listHeight = Math.min(
-                availableHeight,
-                LIST_TOP_PADDING + completeRows * LIST_ROW_HEIGHT
-            );
-            int unusedHeight = availableHeight - listHeight;
-            int listY = layout.getHeaderHeight() + unusedHeight / 2;
-            this.updateSizeAndPosition(width, listHeight, 0, listY);
         }
 
         @Override
