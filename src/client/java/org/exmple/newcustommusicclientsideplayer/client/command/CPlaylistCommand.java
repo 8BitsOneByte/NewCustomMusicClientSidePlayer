@@ -243,7 +243,7 @@ public final class CPlaylistCommand {
         if (shuffle && !startIndexSpecified) {
             startIndex = findRandomPlayableStartIndex(source.getClient(), playlist);
             if (startIndex < 1) {
-                source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound"));
+                source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound").withStyle(ChatFormatting.RED));
                 return 0;
             }
         }

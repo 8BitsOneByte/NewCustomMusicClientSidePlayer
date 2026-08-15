@@ -114,6 +114,7 @@
   "screen.custommusicclientsideplayer.play_instance.start_playing": "开始播放",
   "screen.custommusicclientsideplayer.play_instance.start_index_invalid": "起始序号必须是正整数！",
   "screen.custommusicclientsideplayer.play_instance.start_index_too_large": "起始序号不能超过 %s！",
+  "screen.custommusicclientsideplayer.play_instance.no_playable_from_start_index": "从所选起始位置到播放列表末尾没有可播放的曲目。",
   "screen.newcustommusicclientsideplayer.play_instance.shuffle_on": "随机播放：开",
   "screen.newcustommusicclientsideplayer.play_instance.shuffle_off": "随机播放：关",
   "screen.newcustommusicclientsideplayer.play_instance.shuffle_requires_loop": "您需要打开循环模式才能使用随机播放。",

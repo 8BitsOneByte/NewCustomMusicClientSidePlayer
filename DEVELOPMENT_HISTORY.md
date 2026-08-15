@@ -122,3 +122,44 @@ This record begins with version 1.4.4-beta2. Earlier versions may be documented 
 - Added and reviewed English and Simplified Chinese text for playback volume, track-name transfer, restore-default-name behavior, unapplied-change warnings, countdown states, and detailed configuration differences.
 - Added dedicated translation keys for new shared behaviors, including the track-name fullscreen requirement, instead of reusing keys whose names incorrectly implied that they belonged to an unrelated screen.
 - Updated the project version to `1.4.4-beta2` for community testing before the next stable release.
+
+## 1.4.4 post-beta2 stabilization
+
+**Status:** In progress — between `1.4.4-beta2` and stable `1.4.4`
+
+This entry records small, low-risk maintenance completed while `1.4.4-beta2` remains the community test build and before stable `1.4.4` is published. These changes are part of the existing stabilization period and do not by themselves define or require a separate `1.4.4-beta3` release.
+
+### Repository default-branch migration
+
+- Migrated the main GitHub repository from the legacy `master` branch name to `main` without merging the two unrelated histories or force-overwriting either history.
+- Before the migration, preserved the former placeholder `main` at commit `8528521` as `archive/legacy-main-before-migration` and created the annotated `pre-main-migration` tag at `bf3b7a0` to preserve the complete project state immediately before the branch-name change.
+- Temporarily selected the complete `master` history as the default, removed the placeholder `main`, and then used GitHub's branch-renaming operation to rename the complete branch to `main`. The repository default branch now points to the complete project history.
+- Renamed the local development branch to `main`, updated its upstream to `origin/main`, and updated `origin/HEAD` so new clones and ordinary Git operations consistently select the new default branch.
+- Updated the source-code URLs stored in Fabric mod metadata and the in-game configuration screen from `/tree/master` to `/tree/main`.
+- Updated the main-repository links on the Wiki home page from `/blob/master` to `/blob/main`. The Wiki remains a separate Git repository whose own branch is intentionally still named `master`.
+- Updated the external Modrinth project-level source URL from the branch-specific `/tree/master` path to the repository root. The root URL follows the current default `main` branch automatically and avoids retaining another stale branch-specific link if the default branch name changes again.
+- Immediately afterward, made the repository-owned source links equally resilient by replacing the branch-specific `/tree/main` URLs in Fabric mod metadata and the in-game configuration screen with the repository root.
+- Changed the Wiki's direct development-history and license links from `/blob/main/...` to `/blob/HEAD/...`, preserving their exact file destinations while allowing GitHub to resolve them through whichever branch is currently the repository default.
+- This migration changes repository navigation and source links only. It does not alter playback behavior, configuration data, migrations, transfer formats, translations, or other runtime behavior in the mod.
+
+### Stale Copilot branch cleanup
+
+- Removed the unprotected `copilot/fix-ghost-instances` and `copilot/evaluate-potential-bugs` remote branches after verifying that neither branch was associated with an open, closed, or merged pull request.
+- `copilot/fix-ghost-instances` pointed only to the former placeholder repository commit already retained by the migration archive and contained no independent implementation of the later ghost-instance fix.
+- `copilot/evaluate-potential-bugs` contained no standalone analysis report or applied bug fix. Its project snapshot was already represented in the formal history by commit `c4301aa`, apart from a redundant additional `LICENSE` file.
+- Removing these stale branch names does not change `main`, release tags, the migration recovery points, published artifacts, or any player-facing behavior.
+
+### Playlist playback availability feedback
+
+- Kept the playlist-management screen's **Play Selected Playlist** action available for any selected playlist, including an empty or currently unplayable one. Users can therefore still open the play-instance screen to inspect the saved order, see unavailable tracks marked in the preview, choose a starting index, and review the loop and shuffle controls.
+- The play-instance screen now disables only its **Start Playing** action when the selected settings cannot produce a playable track, replacing the normal GUI path's easy-to-miss chat feedback behind the blurred screen with a directly associated button tooltip.
+- Preserved the existing empty-playlist and invalid-start-index validation, messages, and tooltip behavior. Availability validation runs only after those structural input checks have succeeded.
+- When the complete playlist contains no currently playable sound, **Start Playing** is disabled in both loop modes and its unstyled tooltip reuses the existing localized `no_playable_sound` message.
+- When loop mode is disabled and the playlist has playable tracks only before the selected starting index, **Start Playing** is disabled with a dedicated tooltip explaining that no playable track remains between the selected starting position and the end of the playlist.
+- Complete unavailability is checked before the narrower non-loop starting-position condition. A playlist with no playable track from index 1 through the end therefore always receives the general no-playable-playlist message instead of being misclassified as only a starting-position problem.
+- When loop mode is enabled, any playable track anywhere in the playlist is sufficient because playback may wrap around to an earlier position. When loop mode is disabled, at least one playable track must exist at or after the selected starting index.
+- Partially playable playlists remain supported. Unavailable entries continue to be marked in the preview and skipped by the playback queue, while a valid playable candidate keeps **Start Playing** available.
+- Availability is recalculated when the screen initializes, the starting-index text changes, or the loop or shuffle state changes. It is also recalculated immediately before the start action invokes the playback controller, preventing a stale enabled button from starting playback after resource availability changes while the screen remains open.
+- The playback controller retains its independent empty, availability, queue-position, and final-start checks as defense for unexpected callers or state changes. Under ordinary GUI interaction the screen validation prevents these failure paths, while the controller remains able to reject an invalid request safely if the UI is bypassed.
+- Command-based playlist playback retains its chat error feedback. All command paths that report the no-playable-sound condition now apply explicit red styling, while the corresponding disabled-button tooltips remain the normal white tooltip color.
+- Added reviewed English and Simplified Chinese text for the non-loop starting-position condition. This change does not modify playlist storage, track ordering, import/export formats, configuration data, or the playback queue's established filtering behavior.

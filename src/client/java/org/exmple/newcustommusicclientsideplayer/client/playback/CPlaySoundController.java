@@ -316,14 +316,14 @@ public final class CPlaySoundController {
 
         List<Identifier> playablePlaylist = filterPlayableSounds(client, playlist);
         if (playablePlaylist.isEmpty()) {
-            source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound"));
+            source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound").withStyle(ChatFormatting.RED));
             return 0;
         }
 
         List<Integer> displayIndices = buildPlayableDisplayIndices(client, playlist);
         int startQueueIndex = findStartQueueIndex(displayIndices, startTrackIndex, loop);
         if (startQueueIndex < 0) {
-            source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound"));
+            source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound").withStyle(ChatFormatting.RED));
             return 0;
         }
 
@@ -344,7 +344,7 @@ public final class CPlaySoundController {
 
         if (!playPlaylistIndex(client, startQueueIndex)) {
             clearPlaylistSession();
-            source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound"));
+            source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound").withStyle(ChatFormatting.RED));
             unlockMusicVolume(client);
             return 0;
         }

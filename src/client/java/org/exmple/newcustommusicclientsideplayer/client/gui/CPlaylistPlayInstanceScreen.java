@@ -40,6 +40,8 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
     private static final int COLOR_INCOMPATIBLE_ROW = -8978432;
     private static final Component UNKNOWN_NAMESPACE_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.common.unknown_namespace_track");
     private static final Component UNPLAYABLE_TRACK_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.common.unplayable_track");
+    private static final Component NO_PLAYABLE_SOUND = Component.translatable("message.custommusicclientsideplayer.no_playable_sound");
+    private static final Component NO_PLAYABLE_FROM_START_INDEX = Component.translatable("screen.custommusicclientsideplayer.play_instance.no_playable_from_start_index");
     private static final Component START_INDEX_HINT = Component.translatable("screen.custommusicclientsideplayer.play_instance.start_index_hint").withStyle(EditBox.SEARCH_HINT_STYLE);
     private static final Tooltip SHUFFLE_REQUIRES_LOOP_TOOLTIP = Tooltip.create(Component.translatable("screen.newcustommusicclientsideplayer.play_instance.shuffle_requires_loop"));
 
@@ -220,6 +222,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
         this.playUiClickSound();
         this.updateLoopButtonLabels();
         this.updateShuffleButtonLabels();
+        this.updateValidationState();
     }
 
     private void updateLoopButtonLabels() {
@@ -308,10 +311,46 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
         }
 
         this.startIndexError = error;
-        if (this.startPlayingButton != null) {
-            this.startPlayingButton.active = error == null;
-            this.startPlayingButton.setTooltip(error == null ? null : Tooltip.create(error));
+        Component disabledReason = error;
+        if (disabledReason == null) {
+            disabledReason = this.getPlaybackAvailabilityError(this.getResolvedStartIndex());
         }
+
+        if (this.startPlayingButton != null) {
+            this.startPlayingButton.active = disabledReason == null;
+            this.startPlayingButton.setTooltip(disabledReason == null ? null : Tooltip.create(disabledReason));
+        }
+    }
+
+    @Nullable
+    private Component getPlaybackAvailabilityError(int startIndex) {
+        boolean hasPlayableTrack = false;
+        boolean hasPlayableTrackAtOrAfterStart = false;
+
+        for (int index = 0; index < this.tracks.size(); index++) {
+            if (!CPlaySoundController.isTrackPlayable(this.minecraft, this.tracks.get(index))) {
+                continue;
+            }
+
+            hasPlayableTrack = true;
+            if (index >= startIndex - 1) {
+                hasPlayableTrackAtOrAfterStart = true;
+            }
+
+            if (this.loopEnabled || hasPlayableTrackAtOrAfterStart) {
+                break;
+            }
+        }
+
+        if (!hasPlayableTrack) {
+            return NO_PLAYABLE_SOUND;
+        }
+
+        if (!this.loopEnabled && !hasPlayableTrackAtOrAfterStart) {
+            return NO_PLAYABLE_FROM_START_INDEX;
+        }
+
+        return null;
     }
 
     private int getResolvedStartIndex() {
@@ -331,6 +370,11 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
         int startIndex = this.getResolvedStartIndex();
         if (startIndex < 1 || startIndex > this.tracks.size()) {
             this.updateValidationState();
+            return;
+        }
+
+        this.updateValidationState();
+        if (this.startPlayingButton != null && !this.startPlayingButton.active) {
             return;
         }
 
