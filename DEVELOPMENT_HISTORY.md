@@ -125,9 +125,9 @@ This record begins with version 1.4.4-beta2. Earlier versions may be documented 
 
 ## 1.4.4 post-beta2 stabilization
 
-**Status:** In progress — between `1.4.4-beta2` and stable `1.4.4`
+**Status:** Released as stable `1.4.4` on August 15, 2026
 
-This entry records small, low-risk maintenance completed while `1.4.4-beta2` remains the community test build and before stable `1.4.4` is published. These changes are part of the existing stabilization period and do not by themselves define or require a separate `1.4.4-beta3` release.
+This entry records small, low-risk maintenance completed while `1.4.4-beta2` remained the community test build and before stable `1.4.4` was published. These changes were part of the existing stabilization period and did not by themselves define or require a separate `1.4.4-beta3` release.
 
 ### Repository default-branch migration
 
@@ -163,3 +163,62 @@ This entry records small, low-risk maintenance completed while `1.4.4-beta2` rem
 - The playback controller retains its independent empty, availability, queue-position, and final-start checks as defense for unexpected callers or state changes. Under ordinary GUI interaction the screen validation prevents these failure paths, while the controller remains able to reject an invalid request safely if the UI is bypassed.
 - Command-based playlist playback retains its chat error feedback. All command paths that report the no-playable-sound condition now apply explicit red styling, while the corresponding disabled-button tooltips remain the normal white tooltip color.
 - Added reviewed English and Simplified Chinese text for the non-loop starting-position condition. This change does not modify playlist storage, track ordering, import/export formats, configuration data, or the playback queue's established filtering behavior.
+
+## 1.5.1 Minecraft 26.3 migration
+
+**Status:** In development — not approved for publishing
+
+### Migration boundary and version-line policy
+
+- Version `1.5.1` is a compatibility-only migration of the final stable `1.4.4` feature set from Minecraft 26.2 to Minecraft 26.3. It must not introduce new player-facing features, new diagnostics, additional debug logging, or unrelated cleanup.
+- Beginning with this migration, each `.1` release is reserved for moving the previous line's final stable behavior to the next supported Minecraft version. Feature development belongs in a later version after the migration has been accepted as behaviorally equivalent.
+- Before migration work began, the final Minecraft 26.2 source state was retained on the local `26.2` branch at commit `c23ddb0`. Future migrations should preserve the preceding version's final source on a correspondingly named branch before the active development branch is advanced. This allows a security or maintenance fix to be prepared directly against the affected older line without rolling back the whole repository.
+- Versions predating this convention are not being retroactively reconstructed unless a reliable historical source state already exists. The absence of such a branch must not be hidden by creating an approximate one later.
+- The migration remains blocked from publishing until the complete retained feature set, including all three import/export families, has passed runtime regression testing. A successful compilation or game launch alone is not release approval.
+
+### Toolchain and dependency baseline
+
+- Updated the Minecraft target from 26.2 to 26.3.
+- Updated Fabric Loader from 0.19.3 to 0.19.5 and Fabric API from `0.152.1+26.2` to `0.161.0+26.3`.
+- Updated Fabric Loom from 1.15.5 to 1.17.21 and the Gradle wrapper from 9.2.1 to 9.6 so the development toolchain matches the supported Minecraft 26.3 setup.
+- Java 25 remains the required language and runtime level. No additional mod or runtime dependency was introduced by the migration.
+- The mod version is advanced to `1.5.1` so exported metadata and default transfer filenames identify the compatibility line correctly; transfer-file structures and compatibility rules themselves are unchanged.
+
+### Source-level compatibility changes
+
+- Replaced direct GLFW key constants with the equivalent Minecraft `InputConstants` key values. The configured shortcuts and their behavior are unchanged; only the API used to name the same physical keys changed after Minecraft's window/input migration.
+- Updated the `RenderPipeline` import to its Minecraft 26.3 package. Rendering order, textures, blending behavior, dimensions, and screen layout are unchanged.
+- Converted external-link strings to `URI` values at the Minecraft confirmation-screen boundary required by 26.3. The destinations and confirmation behavior are unchanged.
+- Replaced the removed window-level fullscreen query with Minecraft 26.3's overall fullscreen option state. File-transfer controls retain their established safety rule: configuration, playlist, and custom track-name import/export are unavailable in every fullscreen mode and display the existing instruction to disable fullscreen first.
+- Minecraft 26.3 distinguishes borderless fullscreen from exclusive fullscreen. Its `isExclusiveFullscreen()` result therefore is not equivalent to 26.2's former `isFullscreen()` result: using it would incorrectly leave transfer controls available in borderless fullscreen. The migration deliberately checks the general fullscreen state instead of treating the similarly named method as an API rename.
+- The separate **Exclusive Fullscreen** option selects how a later fullscreen session is presented; enabling that option while the general **Fullscreen** option remains off does not itself enter fullscreen and therefore does not disable file transfer. This matches 26.2, which already stored the general and exclusive-fullscreen states separately and guarded transfer actions only with the general `Window.isFullscreen()` state. Pressing the fullscreen shortcut or otherwise turning the general fullscreen option on disables transfer regardless of whether that fullscreen session is borderless or exclusive.
+
+### Native file-dialog migration
+
+- Version 1.4.4 used LWJGL's Tiny File Dialogs integration behind one asynchronous utility shared by configuration transfer, playlist transfer, and custom track-name transfer. Minecraft 26.3 no longer exposes the former GLFW/TinyFD route used by that implementation, so retaining the old source was not a compile-compatible option.
+- The first compiling migration substituted Java AWT `FileDialog` and kept it on a dedicated executor. Runtime testing rejected that approach: under Minecraft 26.3's SDL-based client window, all three transfer families could open or return through an incompatible desktop-toolkit path and then fail through their existing read/open-error UI. The fact that the substitute compiled did not make it equivalent to the original native dialog behavior.
+- The accepted implementation uses the SDL3 binding already supplied by the Minecraft/LWJGL runtime. It adds no project dependency and does not add a second GUI toolkit to the client process.
+- The shared utility retains its existing `CompletableFuture<Optional<Path>>` contract. Callers still distinguish a selected path, user cancellation, and exceptional dialog failure through the same result shapes, so configuration, playlist, and track-name code do not gain migration-specific branches.
+- SDL file dialogs are asynchronous. Each request therefore receives a unique numeric identifier and is kept in a concurrent active-request map until SDL invokes the persistent callback. This prevents request state and native filter memory from being collected or freed while the operating-system dialog may still use them.
+- The callback treats a null file-list pointer as a dialog failure, a list whose first entry is null as cancellation, and the first UTF-8 path as the single selected file. Multiple selection remains disabled because none of the three established import/export flows accepts multiple files.
+- SDL filter patterns use bare extensions rather than the older `*.extension` spelling. The utility translates existing caller filters such as `*.txt` to SDL's `txt` representation while preserving the caller's localized filter label.
+- The SDL properties-based dialog entry point is used instead of its shorter convenience overload. The properties carry the Minecraft window handle, localized dialog title, original default path or filename, filter pointer and count, and the single-selection rule. This restores the descriptive 1.4.4-era titles rather than allowing Windows to display only its generic **Open** or **Save As** title.
+- Property objects, native filter structures, and the UTF-8 filter strings stay attached to the request and are released only after the callback completes. If setup fails before the dialog is handed to SDL, the partially allocated state is released immediately and the existing exceptional-completion path is used.
+- No migration-only diagnostic logging was added. Native setup and callback failures propagate to the already established screen or toast error handling so `1.5.1` does not publish diagnostics or behavior intended for a later feature release.
+- Shutdown deliberately does not free active dialog state early. SDL may still own an open asynchronous dialog at that point, and releasing its filters or callback state before completion would risk a native use-after-free; normal callback completion owns cleanup while process termination owns any request that cannot return before exit.
+
+### Development-runtime findings
+
+- An initial development launch failed while Fabric Loom was resolving client assets because one expected cache object was absent. This was a development-cache failure rather than a mod file-dialog failure and did not justify changing runtime code or transfer behavior.
+- Subsequent development launches have intermittently terminated in native Windows code after SDL window creation, most often while the log still shows the initial resource reload. The process exit is `NTSTATUS 0xC0000005`, not a Java exception, and therefore produces neither a usable mod stack trace nor a normal Minecraft crash report. Windows Error Reporting has attributed separate occurrences to an unknown address and `jvm.dll`; another occurrence reported heap corruption through `ntdll.dll`. Both IntelliJ's bundled JBR 25.0.2 and the installed Oracle Java 25.0.2 have been affected, so the earlier inference that selecting Oracle Java isolated the problem was incorrect and has been withdrawn.
+- Two controlled Oracle Java launches used new game directories instead of the established `run` directory. One loaded only vanilla, Fabric API, and this mod; the other enabled the same six resource packs listed by the failing launch. Both completed resource loading, initialized OpenAL and the sound engine, created the texture atlases, and remained at the main menu. These controls show that neither installing the mod nor enabling that resource-pack set deterministically reproduces the failure, but they do not disprove an intermittent native interaction.
+- The failing startup did not invoke an import or export action, so it did not submit an SDL file-dialog request. The shared dialog class is referenced by the client-stopping callback, while actual native dialog properties, filters, and request state are allocated only by an import/export call. This makes the dialog request path an unproven cause rather than a justified explanation for the startup crash.
+- Local IntelliJ run configurations were pointed at the installed Java 25 runtime to make development launches reproducible. Those ignored IDE settings are not mod source, are not included in release artifacts, and do not impose an additional end-user configuration. That runtime selection is a development convenience only and is not considered a crash fix.
+
+### Verification record and remaining release gates
+
+- `compileClientJava` has succeeded on the Minecraft 26.3 dependency set without deleting historical build outputs.
+- The development client has launched through Fabric Loader and Fabric API on Minecraft 26.3 and reached an interactive world with resources, sound, rendering, and the migrated screens available, but repeated intermittent native process failures remain unexplained. They are a release blocker until a cause is isolated or a sufficiently strong clean control matrix demonstrates that they are independent of the shipped mod.
+- Runtime testing confirmed that the SDL replacement can open the Windows save dialog and preserves the proposed filename and localized file-type filter. The initial convenience-overload implementation exposed the generic Windows title; the properties-based correction restoring the localized title still requires direct visual confirmation.
+- A source comparison against the retained `26.2` branch found and corrected an initial fullscreen-semantic regression before release: all nine button-state and action-entry guards again reject every fullscreen mode rather than exclusive fullscreen alone. Borderless and exclusive fullscreen behavior both still require direct runtime confirmation.
+- Before publication, configuration import/export, playlist import/export, and custom track-name import/export must each be checked for opening, cancellation, successful read/write, existing validation behavior, and existing failure UI. No push, release, or publication is authorized merely by the current partial recovery.

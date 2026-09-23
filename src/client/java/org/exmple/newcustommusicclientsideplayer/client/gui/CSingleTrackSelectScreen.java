@@ -392,7 +392,7 @@ public final class CSingleTrackSelectScreen extends Screen {
         Identifier selectedTrack = this.getSelectedSound();
         boolean hasSelection = selectedTrack != null;
         boolean hasCustomName = hasSelection && CTrackNameRepository.getCustomName(selectedTrack) != null;
-        boolean fullscreen = this.minecraft != null && this.minecraft.getWindow().isExclusiveFullscreen();
+        boolean fullscreen = this.minecraft != null && this.minecraft.options.fullscreen().get();
         Tooltip fullscreenTooltip = fullscreen ? Tooltip.create(MUST_DISABLE_FULLSCREEN) : null;
         if (this.importButton != null) {
             this.importButton.active = !fullscreen;
@@ -445,7 +445,7 @@ public final class CSingleTrackSelectScreen extends Screen {
     }
 
     private void onImportTrackNames() {
-        if (this.minecraft == null || this.minecraft.getWindow().isExclusiveFullscreen()) {
+        if (this.minecraft == null || this.minecraft.options.fullscreen().get()) {
             return;
         }
 
@@ -505,7 +505,7 @@ public final class CSingleTrackSelectScreen extends Screen {
     }
 
     private void onExportTrackNames() {
-        if (this.minecraft == null || this.minecraft.getWindow().isExclusiveFullscreen()) {
+        if (this.minecraft == null || this.minecraft.options.fullscreen().get()) {
             return;
         }
 

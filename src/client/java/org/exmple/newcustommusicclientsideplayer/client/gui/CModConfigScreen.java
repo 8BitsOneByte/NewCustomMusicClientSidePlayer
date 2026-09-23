@@ -359,7 +359,7 @@ public final class CModConfigScreen extends Screen {
     }
 
     private void onImportConfig() {
-        if (this.minecraft == null || this.minecraft.getWindow().isExclusiveFullscreen()) {
+        if (this.minecraft == null || this.minecraft.options.fullscreen().get()) {
             return;
         }
 
@@ -425,7 +425,7 @@ public final class CModConfigScreen extends Screen {
     }
 
     private void onExportConfig() {
-        if (this.minecraft == null || this.minecraft.getWindow().isExclusiveFullscreen()) {
+        if (this.minecraft == null || this.minecraft.options.fullscreen().get()) {
             return;
         }
 
@@ -481,7 +481,7 @@ public final class CModConfigScreen extends Screen {
      */
     private void updateButtonStates() {
         boolean dirty = this.editSession.isDirty();
-        boolean fullscreen = this.minecraft != null && this.minecraft.getWindow().isExclusiveFullscreen();
+        boolean fullscreen = this.minecraft != null && this.minecraft.options.fullscreen().get();
         Tooltip fullscreenTooltip = fullscreen ? Tooltip.create(MUST_DISABLE_FULLSCREEN) : null;
         if (this.importButton != null) {
             this.importButton.active = !fullscreen;
