@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.Objects;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
@@ -15,7 +16,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
-import org.lwjgl.glfw.GLFW;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigRepository;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
@@ -43,32 +43,32 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
     );
     private static final KeyMapping OPEN_PLAYLIST_CONFIG_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.open_playlist_config",
-            GLFW.GLFW_KEY_Z,
+            InputConstants.KEY_Z,
             CUSTOM_KEY_CATEGORY
     );
     private static final KeyMapping VOLUME_UP_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.volume_up",
-            GLFW.GLFW_KEY_UP,
+            InputConstants.KEY_UP,
             CUSTOM_KEY_CATEGORY
     );
     private static final KeyMapping VOLUME_DOWN_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.volume_down",
-            GLFW.GLFW_KEY_DOWN,
+            InputConstants.KEY_DOWN,
             CUSTOM_KEY_CATEGORY
     );
     private static final KeyMapping PREVIOUS_TRACK_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.previous_track",
-            GLFW.GLFW_KEY_LEFT,
+            InputConstants.KEY_LEFT,
             CUSTOM_KEY_CATEGORY
     );
     private static final KeyMapping NEXT_TRACK_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.next_track",
-            GLFW.GLFW_KEY_RIGHT,
+            InputConstants.KEY_RIGHT,
             CUSTOM_KEY_CATEGORY
     );
     private static final KeyMapping TOGGLE_PAUSE_KEY = new KeyMapping(
             "key.newcustommusicclientsideplayer.toggle_pause",
-            GLFW.GLFW_KEY_Y,
+            InputConstants.KEY_Y,
             CUSTOM_KEY_CATEGORY
     );
 

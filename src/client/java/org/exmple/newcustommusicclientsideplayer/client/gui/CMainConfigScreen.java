@@ -1,5 +1,6 @@
 package org.exmple.newcustommusicclientsideplayer.client.gui;
 
+import java.net.URI;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -40,10 +41,10 @@ public final class CMainConfigScreen extends Screen {
     private static final Component TIPS_AND_TRICKS =
         Component.translatable("screen.custommusicclientsideplayer.tips.title");
 
-    private static final String SOURCE_URL = "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer";
-    private static final String REPORT_BUGS_URL = "https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/issues";
-    private static final String MODRINTH_URL = "https://modrinth.com/mod/new-custom-music-client-side-player";
-    private static final String GITHUB_URL = "https://github.com/8BitsOneByte";
+    private static final URI SOURCE_URL = URI.create("https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer");
+    private static final URI REPORT_BUGS_URL = URI.create("https://github.com/8BitsOneByte/NewCustomMusicClientSidePlayer/issues");
+    private static final URI MODRINTH_URL = URI.create("https://modrinth.com/mod/new-custom-music-client-side-player");
+    private static final URI GITHUB_URL = URI.create("https://github.com/8BitsOneByte");
 
     private final Screen parent;
     private HeaderAndFooterLayout layout;

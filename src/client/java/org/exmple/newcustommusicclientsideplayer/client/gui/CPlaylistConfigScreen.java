@@ -240,7 +240,7 @@ public class CPlaylistConfigScreen extends Screen {
 
     private void updateButtonStates() {
         boolean hasSelection = this.getSelectedSummary() != null;
-        boolean fullscreen = this.minecraft != null && this.minecraft.getWindow().isFullscreen();
+        boolean fullscreen = this.minecraft != null && this.minecraft.getWindow().isExclusiveFullscreen();
         Tooltip fullscreenTooltip = fullscreen ? Tooltip.create(MUST_DISABLE_FULLSCREEN) : null;
         if (this.importButton != null) {
             this.importButton.active = !fullscreen;
@@ -316,7 +316,7 @@ public class CPlaylistConfigScreen extends Screen {
     }
 
     private void onImportPlaylists() {
-        if (this.minecraft == null || this.minecraft.getWindow().isFullscreen()) {
+        if (this.minecraft == null || this.minecraft.getWindow().isExclusiveFullscreen()) {
             return;
         }
 
@@ -370,7 +370,7 @@ public class CPlaylistConfigScreen extends Screen {
     }
 
     private void onExportPlaylists() {
-        if (this.minecraft == null || this.minecraft.getWindow().isFullscreen()) {
+        if (this.minecraft == null || this.minecraft.getWindow().isExclusiveFullscreen()) {
             return;
         }
 
