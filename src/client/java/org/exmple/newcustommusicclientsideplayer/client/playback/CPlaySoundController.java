@@ -78,6 +78,10 @@ public final class CPlaySoundController {
         return OWNED_SOUNDS.hasOwnedSounds() || playlistActive;
     }
 
+    public static CManagedSoundInstance currentSoundForLevelChange() {
+        return OWNED_SOUNDS.current();
+    }
+
     public static boolean shouldKeepPlayingDuringLevelChange() {
         return OWNED_SOUNDS.hasOwnedSounds() || playlistActive;
     }

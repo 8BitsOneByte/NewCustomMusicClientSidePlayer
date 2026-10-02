@@ -230,7 +230,7 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 ### Incremental snapshot development
 
 - Changed the development version from `1.5.2-beta1` to `1.5.2-snapshot1`. The `1.5.2` line uses incremental snapshots to present completed changes throughout development.
-- The first snapshot implements manual-playback pause protection and has completed packaged in-game testing.
+- The first snapshot implements manual-playback pause protection and selective sound cleanup during world changes. Packaged in-game testing has completed for screen-closure pause protection.
 - Mod metadata and transfer metadata derive their version from the Gradle project version.
 
 ### Manual pause during screen closure
@@ -253,9 +253,21 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 - Starting a replacement track or a new single-track or playlist session initializes playback with manual pause cleared.
 - Stopping a session immediately clears the controller's manual-pause state, preparing it for a new session within the same tick.
 
+### Selective sound cleanup during world changes
+
+- Replaced the world-change shortcut that skipped global sound cleanup while a music session existed. Entering a replacement client world now retains the controller's current music instance and its active, uncancelled channel handle, then cleans up the remaining sounds. When that pair is unavailable, the original full-stop operation runs.
+- The retention check uses the exact instance and handle identity. Playing, manually paused, and loading music retain their existing channel, playback position, and pause intent across the transition.
+- Publish cancellation for discarded mapped handles before removing their engine indexes. Remove their instance-to-channel mappings, sound-source entries, delayed playback entries, and deletion deadlines. Clear the tickable sound list, queued tickable sounds, and cached source gains. The retained music instance uses the simple-sound lifecycle.
+- Sweep the actual channel-handle set on the sound executor, retaining the selected handle and releasing every other handle, including handles absent from the engine indexes. Remove a handle from the set before releasing it so queued cancellation cleanup shares the same release ownership.
+- Route static-buffer and stream preparation through the sound executor for all sounds. The execution-time check discards cancelled static-buffer results and closes late streams before attachment. Channel release cleans up attached streams; shared static buffers continue using the engine's shared buffer lifecycle.
+- Apply the same cleanup to elytra wind, biome and underwater ambience, minecart loops, entity-bound sounds, and other sounds from the departing world. Clearing the delayed and tickable queues also removes their scheduled restarts.
+- Preserve vanilla jukebox behavior across dimensions: world departure stops the local disc sound, while the server continues the song timer and note particles; returning follows vanilla playback-event handling to keep world audio faithful to the base game.
+
 ### Verification record
 
 - `compileClientJava --offline` passed using Java 25, Minecraft 26.3, Fabric Loader 0.19.5, and Fabric API `0.161.0+26.3`.
+- On October 2, `compileClientJava --offline` passed after integrating selective world-change cleanup and execution-time cancellation checks for static and streamed sounds.
+- On October 2, in-game reproduction testing confirmed that elytra wind is cleared after an ender-pearl transfer through a Nether portal while mod music is playing, resolving the persistent wind sound after flight ends.
 - On October 2, packaged testing through a third-party launcher on Minecraft 26.3 with Fabric Loader 0.19.5 confirmed that manually paused music stays paused when closing a screen.
 
 ### Development runtime alignment with a verified third-party launcher environment

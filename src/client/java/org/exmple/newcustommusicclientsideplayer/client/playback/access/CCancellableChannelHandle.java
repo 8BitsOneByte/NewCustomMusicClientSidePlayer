@@ -8,8 +8,6 @@ import org.exmple.newcustommusicclientsideplayer.client.playback.CManagedSoundIn
 public interface CCancellableChannelHandle {
     void newcustommusicclientsideplayer$bindManagedSound(CManagedSoundInstance sound);
 
-    boolean newcustommusicclientsideplayer$isManagedPlayback();
-
     boolean newcustommusicclientsideplayer$blocksGlobalResume(Channel channel);
 
     void newcustommusicclientsideplayer$prepareStaticPlayback(SoundBuffer buffer);

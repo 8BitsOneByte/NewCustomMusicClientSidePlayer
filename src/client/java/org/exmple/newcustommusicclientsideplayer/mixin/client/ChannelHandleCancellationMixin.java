@@ -55,11 +55,6 @@ public abstract class ChannelHandleCancellationMixin implements CCancellableChan
     }
 
     @Override
-    public boolean newcustommusicclientsideplayer$isManagedPlayback() {
-        return newcustommusicclientsideplayer$managedSound != null;
-    }
-
-    @Override
     public boolean newcustommusicclientsideplayer$blocksGlobalResume(Channel target) {
         CManagedSoundInstance sound = newcustommusicclientsideplayer$managedSound;
         return channel == target && (newcustommusicclientsideplayer$cancelled
@@ -122,7 +117,7 @@ public abstract class ChannelHandleCancellationMixin implements CCancellableChan
     private void newcustommusicclientsideplayer$startOrResume() {
         CManagedSoundInstance sound = newcustommusicclientsideplayer$managedSound;
         if (newcustommusicclientsideplayer$cancelled || channel == null
-                || sound == null || sound.isPlaybackPaused()
+                || (sound != null && sound.isPlaybackPaused())
                 || !newcustommusicclientsideplayer$prepared) {
             return;
         }

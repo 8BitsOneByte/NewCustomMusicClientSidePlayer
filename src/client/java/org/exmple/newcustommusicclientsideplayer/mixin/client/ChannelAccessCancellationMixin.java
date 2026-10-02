@@ -25,6 +25,21 @@ public abstract class ChannelAccessCancellationMixin implements CCancellableChan
     }
 
     @Override
+    public void newcustommusicclientsideplayer$releaseAllExcept(ChannelAccess.ChannelHandle retainedHandle) {
+        executor.execute(() -> {
+            var iterator = channels.iterator();
+            while (iterator.hasNext()) {
+                ChannelAccess.ChannelHandle handle = iterator.next();
+                if (handle != retainedHandle) {
+                    ((CCancellableChannelHandle) handle).newcustommusicclientsideplayer$cancel();
+                    iterator.remove();
+                    handle.release();
+                }
+            }
+        });
+    }
+
+    @Override
     public void newcustommusicclientsideplayer$scheduleCancelledHandleRelease(
             ChannelAccess.ChannelHandle handle
     ) {
