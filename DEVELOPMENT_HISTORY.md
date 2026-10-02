@@ -1,8 +1,8 @@
 # Development History
 
-This document is an append-oriented record of user-visible features, compatibility decisions, data migrations, and notable behavioral changes in New Custom Music Client-Side Player.
+This document is an append-oriented record of player-visible features, compatibility decisions, data migrations, and notable behavioral changes in New Custom Music Client-Side Player.
 
-It complements, rather than replaces, release notes and Git history:
+It records project development alongside release notes and Git history:
 
 - Release notes provide a concise overview for players.
 - This document preserves the complete product-level history behind those highlights.
@@ -12,11 +12,12 @@ It complements, rather than replaces, release notes and Git history:
 
 - Version entries are ordered from oldest to newest. New entries are appended to the end of the document.
 - Before a version is published, its draft entry may be expanded or corrected as implementation and testing continue. After publication, the entry follows the historical-preservation rules below.
-- Published entries should not be silently removed or rewritten.
+- Published entries preserve the development record; substantive corrections carry a date.
 - If a historical statement is found to be inaccurate, a dated correction should be appended to the relevant entry.
 - Spelling, grammar, formatting, and broken links may be corrected directly when their meaning is unchanged.
-- A version entry is complete only when it records every relevant user-visible behavior, data format, migration rule and priority, validation boundary, error or warning branch, conflict-resolution rule, failure protection, and important interaction detail introduced or changed by that version.
-- Exact limits, ordering, fallback behavior, and persistence guarantees should be stated whenever users, resource-pack authors, translators, or maintainers could depend on them later.
+- A version entry is complete only when it records every relevant player-visible behavior, data format, migration rule and priority, validation boundary, error or warning branch, conflict-resolution rule, failure protection, and important interaction detail introduced or changed by that version.
+- Exact limits, ordering, fallback behavior, and persistence guarantees should be stated whenever players, resource-pack authors, translators, or maintainers could depend on them later.
+- Entries describe changes, implementation mechanisms, completed tests, and release status from the developer's perspective.
 - Before release, the entry should be audited against the complete version diff so concise release notes and current-use documentation can safely omit these details without making them untraceable.
 - Class names, private method names, variable renames, formatting-only edits, and pure refactors are excluded unless they affect compatibility, maintenance expectations, or observable behavior. Git history remains the source for those implementation details.
 
@@ -42,59 +43,59 @@ This record begins with version 1.4.4-beta2. Earlier versions may be documented 
 - Playback-volume keyboard shortcuts continue to change the value in five-percentage-point steps. When a non-multiple such as 98% is increased, it first reaches the 100% boundary; only a subsequent attempt reports that the maximum has already been reached.
 - Playback-volume shortcuts are applied only while no screen is open, preventing configuration drafts and Minecraft's keyboard navigation from interfering with one another.
 - Shortcut changes are saved to the unified configuration immediately. If that save fails, the in-memory value remains active and the client retries the pending configuration save during shutdown.
-- Changing or applying the volume also updates the base volume of a currently playing mod-owned sound instead of waiting for the next track.
+- Changing or applying the volume immediately updates the base volume of the currently playing mod-owned sound.
 - Existing playback-volume data is migrated silently on startup. If `config.json` has no playback-volume field, the legacy value is used; a valid volume already owned by `config.json` takes priority.
-- When migration succeeds, `playback_volume.json` is renamed to `playback_volume.json.migrated`. An existing migrated file is never overwritten, and the legacy source is not deliberately removed until the unified configuration has successfully taken ownership of the value.
-- If a new unified configuration cannot be saved, the legacy file is kept, its value remains usable in memory, and migration can be attempted again on a later launch. An unreadable or structurally invalid main configuration likewise does not trigger retirement of the legacy source.
+- When migration succeeds, `playback_volume.json` is renamed to `playback_volume.json.migrated`. An existing migrated file is preserved. Retirement of the legacy source follows successful storage of the volume in the unified configuration.
+- If saving a new unified configuration fails, the legacy file is kept, its value remains usable in memory, and migration can be attempted again on a later launch. An unreadable or structurally invalid main configuration also keeps the legacy source available.
 - Migrated and loaded numeric volume values are constrained to the supported 0-100 range. A non-integer or otherwise unreadable stored volume falls back to the default of 100%.
-- Missing fields in an otherwise valid configuration are restored from defaults and written back, so installations created by older versions acquire newly introduced settings without requiring a manual reset.
+- Missing fields in an otherwise valid configuration are restored from defaults and written back automatically, so installations created by older versions acquire newly introduced settings.
 - This missing-field repair covers update checks, the now-playing toast, playback feedback mode, and playback volume while preserving other members of the existing JSON object during the repair write.
-- Configuration import and export now include playback volume. Import accepts only an integer from 0 to 100; an invalid value is skipped through the normal recoverable configuration-warning flow rather than replacing the draft.
-- Configuration-import warnings use reliable labels from the active Minecraft language for known settings instead of exposing internal JSON field names.
-- An unknown skipped field still falls back to its literal transfer-file field name because no reliable localized setting label exists for it.
+- Configuration import and export now include playback volume. Import accepts an integer from 0 to 100; invalid values are skipped through the recoverable configuration-warning flow, preserving the draft value.
+- Configuration-import warnings use labels from the active Minecraft language for known settings.
+- An unknown skipped field uses its literal transfer-file field name as the warning label.
 
 ### Unapplied configuration changes
 
-- Leaving a modified configuration screen through Back or Esc now opens an unapplied-changes warning instead of silently discarding the draft.
+- Leaving a modified configuration screen through Back or Esc now opens an unapplied-changes warning.
 - The warning lists the settings that would be discarded in the same order as the configuration screen. Each entry shows the applied value, a right arrow, and the draft value with distinct colors for easier comparison.
 - The warning shows only fields whose draft values actually differ from the applied configuration.
 - Setting labels are aqua, applied values are gray, arrow punctuation is dark gray, and draft values are yellow. Boolean values reuse Minecraft's localized On/Off text, feedback modes reuse their existing translated labels, and volume values include a percent sign.
-- **Keep Editing** returns to the exact draft screen and is the initially focused action. **Discard Changes** immediately confirms the user's choice and exits without applying the draft.
-- Explicitly clicking **Discard Changes** is not delayed by the countdown.
-- Esc-based discard is guarded for three seconds. During the countdown, additional Esc presses do nothing; after it finishes, pressing Esc discards the changes directly instead of returning to the draft.
+- **Keep Editing** returns to the exact draft screen and is the initially focused action. **Discard Changes** immediately confirms the discard choice, retains the applied configuration, and exits.
+- Clicking **Discard Changes** takes effect immediately.
+- Esc-based discard is guarded for three seconds. During the countdown, additional Esc presses are ignored; after it finishes, pressing Esc discards the changes and exits.
 - The countdown is centered directly below the title and enclosed in gray parentheses. Remaining seconds are yellow, `Esc` is aqua and bold, and the ready-state instruction is yellow.
 
 ### Shared warning-screen presentation
 
 - Warning content now uses a dynamically sized bordered panel for up to twelve wrapped lines.
 - Longer warning content switches to a scrollable list while keeping the same overall screen structure.
-- Short one- or two-line warnings no longer receive a misleading scrollbar or lose part of their final text line because of text-area padding.
+- Short one- or two-line warnings display their complete text with padding adjusted to the content height.
 - The shared warning-screen foundation now supports an optional centered dynamic subtitle and a screen-defined initial button focus.
 - The sizing correction applies to every screen using this shared presentation, including playlist import, configuration import, track-name import, and the new unapplied-change warning.
 
 ### Custom single-track names
 
 - Added import and export icon buttons to the single-track selection screen.
-- The transfer buttons are disabled in fullscreen because the operating-system file dialog is unavailable there. Their tooltip changes to a dedicated track-name-transfer instruction to disable fullscreen; this does not reuse the configuration screen's translation key.
-- Both dialogs filter for `.txt` files. Closing either dialog without selecting a path leaves all data unchanged, and a dialog result is ignored if the user has already left the single-track screen before the asynchronous result returns.
+- The transfer buttons are disabled in fullscreen because the operating-system file dialog is unavailable there. A dedicated track-name-transfer tooltip explains how to disable fullscreen.
+- Both dialogs filter for `.txt` files. Closing either dialog with an empty selection preserves the current data. Asynchronous results are discarded after the player leaves the single-track screen.
 - The default export filename combines the mod name and mod version with `-track-names.txt`, replacing characters that are unsafe in filenames.
 - Export creates a UTF-8, human-readable structured text file containing format version 1, the mod ID, mod version, Minecraft version, export time, and the custom track-name map.
-- Entries that still use their original IDs are omitted because they require no stored override. Export remains available when there are no custom mappings and produces a valid transfer file with an empty map.
+- Export includes custom display-name overrides. An empty custom-name map produces a valid transfer file with an empty map.
 - Successful export reports the normalized destination path in a success toast. A file-write failure reports the selected path in a failure toast, while failure to open the save dialog uses a separate failure message.
 - Import previews and validates the complete file before changing local data. A missing, non-file, empty, inaccessible, or otherwise unreadable source opens the read-error screen.
 - A non-object root, malformed or trailing JSON, duplicate top-level `modId` or `trackNames` members, a non-text `modId`, a non-object `trackNames` value, a missing required member, or a different mod ID opens the invalid-file screen.
-- Version and export metadata are informational in format 1. Import identifies compatibility from the mod ID and `trackNames` object and ignores other top-level fields, allowing metadata additions without invalidating otherwise compatible files.
+- Version and export metadata are informational in format 1. Import identifies compatibility from the mod ID and `trackNames` object and ignores other top-level fields, supporting later metadata additions.
 - Recoverable warnings are ordered as invalid sound-event IDs, duplicate IDs, non-text values, empty names, names longer than 50 characters, redundant default-name entries, same-namespace name conflicts, and replacements of existing custom names. A category is displayed only when it actually occurs.
-- Imported text names are trimmed before empty, length, default-name, and conflict checks. When an ID occurs more than once in the transfer object, every occurrence of that ID is skipped rather than choosing one silently.
-- Invalid, duplicate, non-text, empty, overlong, redundant-default, and conflicting entries are skipped while compatible entries remain eligible for import. If no compatible entry remains, the operation stops on a dedicated screen without writing local data.
-- Same-namespace display-name conflicts are compared without letter-case differences. Existing or otherwise unchanged names take priority; when only imported candidates collide, the earlier transfer entry keeps its candidate name and later candidates are rejected, with conflicts recalculated until the final set is stable.
+- Imported text names are trimmed before empty, length, default-name, and conflict checks. Repeated IDs cause every occurrence of that ID to be skipped.
+- Invalid, duplicate, non-text, empty, overlong, redundant-default, and conflicting entries are skipped while compatible entries remain eligible for import. An empty compatible set ends the operation on a dedicated screen and preserves local data.
+- Same-namespace display-name conflicts use case-insensitive comparison. Existing names take priority; when imported candidates collide, the earlier entry keeps its candidate name and later entries are rejected. Conflicts are recalculated until the final set is stable.
 - The warning preview distinguishes namespaces, paths, existing names, and imported names with the same color-oriented presentation used by related music-management screens.
-- A warning preview requires confirmation before applying compatible entries. A clean preview with compatible entries applies directly without inserting an unnecessary confirmation screen.
-- A mapping is retained when its sound event is absent from the currently loaded resource packs. Availability alone neither generates a warning nor causes the mapping to be skipped, allowing transfer files to preserve names for optional or temporarily disabled packs.
-- Confirming an import writes the compatible mappings atomically, refreshes the namespace currently being viewed, and clears the previous row selection so controls cannot operate on stale list state.
-- The success toast reports the number of mappings whose stored names actually changed. An otherwise compatible mapping that already has the imported value counts as zero changes and does not by itself cause a repository rewrite.
+- A warning preview requires confirmation before applying compatible entries. A clean preview applies compatible entries directly.
+- Mappings for sound events absent from the currently loaded resource packs remain eligible for import, supporting optional or temporarily disabled packs.
+- Confirming an import writes the compatible mappings atomically, refreshes the namespace currently being viewed, and clears the previous row selection so controls use the refreshed list state.
+- The success toast counts mappings whose stored names actually changed. Importing identical mappings produces a zero-change result and preserves the existing repository file.
 - The track-name repository now reads and writes explicitly as UTF-8. Rename and import operations prepare a separate updated map, write it through a temporary-file replacement, and update the in-memory map only after that write succeeds.
-- If loading the existing repository throws a read or parse error, rename, restore, export, and import operations fail instead of treating the repository as empty and overwriting the unreadable data.
+- A read or parse error while loading the existing repository stops rename, restore, export, and import operations and preserves the source file.
 - Import-save failure opens a dedicated error screen and leaves the existing stored and in-memory names unchanged. Restore failure sends a translated system message, and export failures use the toast paths described above.
 
 ### Single-track selection interface
@@ -102,36 +103,36 @@ This record begins with version 1.4.4-beta2. Earlier versions may be documented 
 - Reorganized the bottom actions into a consistent two-by-two, 150-pixel button layout: **Play Selected Track**, **Rename Track**, **Restore Default Name**, and **Back**.
 - Kept Play as the upper-left action to preserve the most familiar primary-action position.
 - Added **Restore Default Name**, which removes the selected track's custom mapping and displays its original sound-event ID again.
-- Restore is available only when the selected track currently has a custom name. Its explanatory tooltip is shown only while the button is available; routine disabled states do not add redundant tooltips.
+- Restore is available for a selected track with a custom name. Its explanatory tooltip appears while the button is available.
 - Play and Rename require any selected track; Restore additionally requires that selection to have a custom name. Refreshing entries after rename, restore, or import clears stale selection state and recalculates all three button states.
 - Fixed the search field at 20 pixels high and increased the footer to accommodate the second action row. The transfer buttons sit beside the search field while balancing space keeps the search control visually centered.
-- The track list now fills all remaining content height instead of enlarging the search field or reserving unused space merely to show only complete 36-pixel rows.
+- The track list now fills all remaining content height.
 
 ### Playlist naming and transfer consistency
 
 - Playlist-name conflict checks in graphical create and rename screens now use exact, case-sensitive comparison, matching command and storage semantics.
-- Playlist import collision handling follows the same rule. Names that differ only by letter case can therefore coexist consistently instead of being rejected by one interface and accepted by another.
-- A rename that changes only letter case is therefore allowed unless another playlist already has that exact target spelling. An unchanged exact name continues to be rejected as the original name rather than treated as a rename.
-- Exact import collisions continue to use the established automatic numeric-suffix renaming. A case-only difference no longer triggers that automatic rename.
+- Playlist import uses the same exact, case-sensitive comparison. Names that differ by letter case can coexist across graphical and command interfaces.
+- A case-only rename is allowed when the target spelling is available. Exact duplicate names and renaming to the current name are rejected.
+- Exact import collisions use automatic numeric-suffix renaming. Case-distinct names retain their imported spelling.
 - Replaced the outdated graphical naming hint that implied playlist names were restricted to letters, numbers, and underscores, and removed the unused invalid-character translation. Graphical names are trimmed, must contain 1-50 characters, and may contain spaces, Unicode characters, punctuation, and underscores.
 - Command arguments continue to use exact, case-sensitive playlist names and suggestions continue to insert the stored spelling, so the graphical and command paths now agree on case-only names.
-- Standardized user-visible before-and-after changes on the Unicode right arrow (`→`) instead of mixing it with the older ASCII `->` representation.
+- Standardized player-visible before-and-after changes on the Unicode right arrow (`→`) instead of mixing it with the older ASCII `->` representation.
 
 ### Localization and release metadata
 
 - Added and reviewed English and Simplified Chinese text for playback volume, track-name transfer, restore-default-name behavior, unapplied-change warnings, countdown states, and detailed configuration differences.
-- Added dedicated translation keys for new shared behaviors, including the track-name fullscreen requirement, instead of reusing keys whose names incorrectly implied that they belonged to an unrelated screen.
+- Added dedicated translation keys for new shared behaviors, including the track-name fullscreen requirement.
 - Updated the project version to `1.4.4-beta2` for community testing before the next stable release.
 
 ## 1.4.4 post-beta2 stabilization
 
 **Status:** Released as stable `1.4.4` on August 15, 2026
 
-This entry records small, low-risk maintenance completed while `1.4.4-beta2` remained the community test build and before stable `1.4.4` was published. These changes were part of the existing stabilization period and did not by themselves define or require a separate `1.4.4-beta3` release.
+This entry records maintenance completed during the `1.4.4-beta2` stabilization period and included in stable `1.4.4`.
 
 ### Repository default-branch migration
 
-- Migrated the main GitHub repository from the legacy `master` branch name to `main` without merging the two unrelated histories or force-overwriting either history.
+- Migrated the main GitHub repository from the legacy `master` branch name to `main`, retaining the complete project history and archiving the former placeholder history.
 - Before the migration, preserved the former placeholder `main` at commit `8528521` as `archive/legacy-main-before-migration` and created the annotated `pre-main-migration` tag at `bf3b7a0` to preserve the complete project state immediately before the branch-name change.
 - Temporarily selected the complete `master` history as the default, removed the placeholder `main`, and then used GitHub's branch-renaming operation to rename the complete branch to `main`. The repository default branch now points to the complete project history.
 - Renamed the local development branch to `main`, updated its upstream to `origin/main`, and updated `origin/HEAD` so new clones and ordinary Git operations consistently select the new default branch.
@@ -140,89 +141,127 @@ This entry records small, low-risk maintenance completed while `1.4.4-beta2` rem
 - Updated the external Modrinth project-level source URL from the branch-specific `/tree/master` path to the repository root. The root URL follows the current default `main` branch automatically and avoids retaining another stale branch-specific link if the default branch name changes again.
 - Immediately afterward, made the repository-owned source links equally resilient by replacing the branch-specific `/tree/main` URLs in Fabric mod metadata and the in-game configuration screen with the repository root.
 - Changed the Wiki's direct development-history and license links from `/blob/main/...` to `/blob/HEAD/...`, preserving their exact file destinations while allowing GitHub to resolve them through whichever branch is currently the repository default.
-- This migration changes repository navigation and source links only. It does not alter playback behavior, configuration data, migrations, transfer formats, translations, or other runtime behavior in the mod.
 
 ### Stale Copilot branch cleanup
 
-- Removed the unprotected `copilot/fix-ghost-instances` and `copilot/evaluate-potential-bugs` remote branches after verifying that neither branch was associated with an open, closed, or merged pull request.
-- `copilot/fix-ghost-instances` pointed only to the former placeholder repository commit already retained by the migration archive and contained no independent implementation of the later ghost-instance fix.
-- `copilot/evaluate-potential-bugs` contained no standalone analysis report or applied bug fix. Its project snapshot was already represented in the formal history by commit `c4301aa`, apart from a redundant additional `LICENSE` file.
-- Removing these stale branch names does not change `main`, release tags, the migration recovery points, published artifacts, or any player-facing behavior.
+- Reviewed pull-request associations and removed the stale `copilot/fix-ghost-instances` and `copilot/evaluate-potential-bugs` remote branches.
+- The former placeholder commit referenced by `copilot/fix-ghost-instances` is retained in the migration archive.
+- The project snapshot from `copilot/evaluate-potential-bugs` is represented by commit `c4301aa`; cleanup also retired its redundant additional `LICENSE` file.
 
 ### Playlist playback availability feedback
 
-- Kept the playlist-management screen's **Play Selected Playlist** action available for any selected playlist, including an empty or currently unplayable one. Users can therefore still open the play-instance screen to inspect the saved order, see unavailable tracks marked in the preview, choose a starting index, and review the loop and shuffle controls.
-- The play-instance screen now disables only its **Start Playing** action when the selected settings cannot produce a playable track, replacing the normal GUI path's easy-to-miss chat feedback behind the blurred screen with a directly associated button tooltip.
+- Kept the playlist-management screen's **Play Selected Playlist** action available for any selected playlist, including an empty or currently unplayable one. Players can therefore still open the play-instance screen to inspect the saved order, see unavailable tracks marked in the preview, choose a starting index, and review the loop and shuffle controls.
+- The play-instance screen now disables **Start Playing** for settings with an empty playable set and displays the reason in a button tooltip, making playback availability visible on the screen.
 - Preserved the existing empty-playlist and invalid-start-index validation, messages, and tooltip behavior. Availability validation runs only after those structural input checks have succeeded.
 - When the complete playlist contains no currently playable sound, **Start Playing** is disabled in both loop modes and its unstyled tooltip reuses the existing localized `no_playable_sound` message.
 - When loop mode is disabled and the playlist has playable tracks only before the selected starting index, **Start Playing** is disabled with a dedicated tooltip explaining that no playable track remains between the selected starting position and the end of the playlist.
-- Complete unavailability is checked before the narrower non-loop starting-position condition. A playlist with no playable track from index 1 through the end therefore always receives the general no-playable-playlist message instead of being misclassified as only a starting-position problem.
+- Complete playlist unavailability is checked before the non-loop starting-position condition. An empty playable set receives the general no-playable-playlist message; a playable set entirely before the starting index receives the starting-position message.
 - When loop mode is enabled, any playable track anywhere in the playlist is sufficient because playback may wrap around to an earlier position. When loop mode is disabled, at least one playable track must exist at or after the selected starting index.
 - Partially playable playlists remain supported. Unavailable entries continue to be marked in the preview and skipped by the playback queue, while a valid playable candidate keeps **Start Playing** available.
 - Availability is recalculated when the screen initializes, the starting-index text changes, or the loop or shuffle state changes. It is also recalculated immediately before the start action invokes the playback controller, preventing a stale enabled button from starting playback after resource availability changes while the screen remains open.
 - The playback controller retains its independent empty, availability, queue-position, and final-start checks as defense for unexpected callers or state changes. Under ordinary GUI interaction the screen validation prevents these failure paths, while the controller remains able to reject an invalid request safely if the UI is bypassed.
 - Command-based playlist playback retains its chat error feedback. All command paths that report the no-playable-sound condition now apply explicit red styling, while the corresponding disabled-button tooltips remain the normal white tooltip color.
-- Added reviewed English and Simplified Chinese text for the non-loop starting-position condition. This change does not modify playlist storage, track ordering, import/export formats, configuration data, or the playback queue's established filtering behavior.
+- Added reviewed English and Simplified Chinese text for the non-loop starting-position condition.
 
 ## 1.5.1 Minecraft 26.3 migration
 
-**Status:** `1.5.1-beta` approved for beta publication; stable promotion pending a one-week observation period
+**Status:** `1.5.1-beta` ready for beta publication; stable promotion pending a one-week observation period
 
 ### Migration boundary and version-line policy
 
-- Version `1.5.1-beta` is a compatibility-only migration of the final stable `1.4.4` feature set from Minecraft 26.2 to Minecraft 26.3. It must not introduce new player-facing features, new diagnostics, additional debug logging, or unrelated cleanup. If the beta observation period finds no release-blocking regression, the same feature set will be promoted to stable `1.5.1` without using that promotion to introduce deferred features.
-- Beginning with this migration, each `.1` release is reserved for moving the previous line's final stable behavior to the next supported Minecraft version. Feature development belongs in a later version after the migration has been accepted as behaviorally equivalent.
+- Migrated the final stable `1.4.4` feature set from Minecraft 26.2 to Minecraft 26.3 for version `1.5.1-beta`.
+- Beginning with this migration, each `.1` release moves the previous line to the next supported Minecraft version. Later versions carry feature development.
 - Before migration work began, the final Minecraft 26.2 source state was retained on the local `26.2` branch at commit `c23ddb0`. Future migrations should preserve the preceding version's final source on a correspondingly named branch before the active development branch is advanced. This allows a security or maintenance fix to be prepared directly against the affected older line without rolling back the whole repository.
-- Versions predating this convention are not being retroactively reconstructed unless a reliable historical source state already exists. The absence of such a branch must not be hidden by creating an approximate one later.
-- Beta publication required runtime verification beyond compilation or a single successful launch. That threshold was met through packaged-beta startup testing on the final Minecraft 26.3 release, a minimal-dependency test, and an end-to-end old-version transfer rehearsal. Stable publication remains separate and requires the beta to complete its observation period without a reproducible startup failure, transfer regression, data-loss problem, or other release-blocking report.
+- Beta verification included packaged startup testing on the final Minecraft 26.3 release, a minimal-dependency installation, and an end-to-end transfer rehearsal from the previous version.
 
 ### Toolchain and dependency baseline
 
 - Updated the Minecraft target from 26.2 to 26.3.
 - Updated Fabric Loader from 0.19.3 to 0.19.5 and Fabric API from `0.152.1+26.2` to `0.161.0+26.3`.
 - Updated Fabric Loom from 1.15.5 to 1.17.21 and the Gradle wrapper from 9.2.1 to 9.6 so the development toolchain matches the supported Minecraft 26.3 setup.
-- Java 25 remains the required language and runtime level. No additional mod or runtime dependency was introduced by the migration.
-- The beta metadata version is `1.5.1-beta`; the intended stable promotion is `1.5.1`. Exported metadata and default transfer filenames therefore identify the beta while it is under observation. Transfer-file structures and compatibility rules themselves are unchanged.
+- Java 25 is the required language and runtime level.
+- Set beta metadata to `1.5.1-beta` and the stable target to `1.5.1`. Exported metadata and default transfer filenames identify the active project version.
 
 ### Source-level compatibility changes
 
-- Replaced direct GLFW key constants with the equivalent Minecraft `InputConstants` key values. The configured shortcuts and their behavior are unchanged; only the API used to name the same physical keys changed after Minecraft's window/input migration.
-- Updated the `RenderPipeline` import to its Minecraft 26.3 package. Rendering order, textures, blending behavior, dimensions, and screen layout are unchanged.
-- Converted external-link strings to `URI` values at the Minecraft confirmation-screen boundary required by 26.3. The destinations and confirmation behavior are unchanged.
+- Replaced direct GLFW key constants with the equivalent Minecraft `InputConstants` key values after the window/input API migration.
+- Updated the `RenderPipeline` import to its Minecraft 26.3 package.
+- Converted external-link strings to `URI` values at the Minecraft confirmation-screen boundary required by 26.3.
 - Replaced the removed window-level fullscreen query with Minecraft 26.3's overall fullscreen option state. File-transfer controls retain their established safety rule: configuration, playlist, and custom track-name import/export are unavailable in every fullscreen mode and display the existing instruction to disable fullscreen first.
-- Minecraft 26.3 distinguishes borderless fullscreen from exclusive fullscreen. Its `isExclusiveFullscreen()` result therefore is not equivalent to 26.2's former `isFullscreen()` result: using it would incorrectly leave transfer controls available in borderless fullscreen. The migration deliberately checks the general fullscreen state instead of treating the similarly named method as an API rename.
-- The separate **Exclusive Fullscreen** option selects how a later fullscreen session is presented; enabling that option while the general **Fullscreen** option remains off does not itself enter fullscreen and therefore does not disable file transfer. This matches 26.2, which already stored the general and exclusive-fullscreen states separately and guarded transfer actions only with the general `Window.isFullscreen()` state. Pressing the fullscreen shortcut or otherwise turning the general fullscreen option on disables transfer regardless of whether that fullscreen session is borderless or exclusive.
+- Minecraft 26.3 distinguishes borderless and exclusive fullscreen. File-transfer controls now check the general fullscreen option, covering both modes.
+- The **Exclusive Fullscreen** preference selects the presentation mode for fullscreen. File transfer remains available while the general **Fullscreen** option is off and is disabled when that option is on.
 
 ### Native file-dialog migration
 
-- Version 1.4.4 used LWJGL's Tiny File Dialogs integration behind one asynchronous utility shared by configuration transfer, playlist transfer, and custom track-name transfer. Minecraft 26.3 no longer exposes the former GLFW/TinyFD route used by that implementation, so retaining the old source was not a compile-compatible option.
-- The first compiling migration substituted Java AWT `FileDialog` and kept it on a dedicated executor. Runtime testing rejected that approach: under Minecraft 26.3's SDL-based client window, all three transfer families could open or return through an incompatible desktop-toolkit path and then fail through their existing read/open-error UI. The fact that the substitute compiled did not make it equivalent to the original native dialog behavior.
-- The accepted implementation uses the SDL3 binding already supplied by the Minecraft/LWJGL runtime. It adds no project dependency and does not add a second GUI toolkit to the client process.
-- The shared utility retains its existing `CompletableFuture<Optional<Path>>` contract. Callers still distinguish a selected path, user cancellation, and exceptional dialog failure through the same result shapes, so configuration, playlist, and track-name code do not gain migration-specific branches.
+- Migrated the asynchronous file-dialog utility shared by configuration, playlist, and custom track-name transfer from Tiny File Dialogs to Minecraft 26.3's SDL3 runtime.
+- An initial AWT `FileDialog` implementation produced read/open-error screens during runtime testing with the SDL-based client window. Replaced it with SDL3 file dialogs.
+- The implementation uses the SDL3 binding supplied by the Minecraft/LWJGL runtime.
+- The shared utility returns `CompletableFuture<Optional<Path>>`, representing a selected path, dialog cancellation, or exceptional failure for configuration, playlist, and track-name transfer.
 - SDL file dialogs are asynchronous. Each request therefore receives a unique numeric identifier and is kept in a concurrent active-request map until SDL invokes the persistent callback. This prevents request state and native filter memory from being collected or freed while the operating-system dialog may still use them.
-- The callback treats a null file-list pointer as a dialog failure, a list whose first entry is null as cancellation, and the first UTF-8 path as the single selected file. Multiple selection remains disabled because none of the three established import/export flows accepts multiple files.
+- The callback treats a null file-list pointer as a dialog failure, a list whose first entry is null as cancellation, and the first UTF-8 path as the selected file. Dialogs use single-file selection.
 - SDL filter patterns use bare extensions rather than the older `*.extension` spelling. The utility translates existing caller filters such as `*.txt` to SDL's `txt` representation while preserving the caller's localized filter label.
-- The SDL properties-based dialog entry point is used instead of its shorter convenience overload. The properties carry the Minecraft window handle, localized dialog title, original default path or filename, filter pointer and count, and the single-selection rule. This restores the descriptive 1.4.4-era titles rather than allowing Windows to display only its generic **Open** or **Save As** title.
+- The SDL properties-based dialog entry point carries the Minecraft window handle, localized title, default path or filename, filter pointer and count, and single-selection setting. It restores the descriptive file-dialog titles.
 - Property objects, native filter structures, and the UTF-8 filter strings stay attached to the request and are released only after the callback completes. If setup fails before the dialog is handed to SDL, the partially allocated state is released immediately and the existing exceptional-completion path is used.
-- No migration-only diagnostic logging was added. Native setup and callback failures propagate to the already established screen or toast error handling so `1.5.1` does not publish diagnostics or behavior intended for a later feature release.
-- Shutdown deliberately does not free active dialog state early. SDL may still own an open asynchronous dialog at that point, and releasing its filters or callback state before completion would risk a native use-after-free; normal callback completion owns cleanup while process termination owns any request that cannot return before exit.
+- Native setup and callback failures use the existing screen and toast error handling.
+- Active dialog properties, filters, and callback state stay allocated until SDL completes the asynchronous request. Callback completion owns normal cleanup; process termination handles requests still active at exit. This lifetime rule protects SDL's access to native request memory.
 
 ### Development-runtime findings
 
-- An initial development launch failed while Fabric Loom was resolving client assets because one expected cache object was absent. This was a development-cache failure rather than a mod file-dialog failure and did not justify changing runtime code or transfer behavior.
-- Subsequent development launches have intermittently terminated in native Windows code after SDL window creation, most often while the log still shows the initial resource reload. The process exit is `NTSTATUS 0xC0000005`, not a Java exception, and therefore produces neither a usable mod stack trace nor a normal Minecraft crash report. Windows Error Reporting has attributed separate occurrences to an unknown address and `jvm.dll`; another occurrence reported heap corruption through `ntdll.dll`. Both IntelliJ's bundled JBR 25.0.2 and the installed Oracle Java 25.0.2 have been affected, so the earlier inference that selecting Oracle Java isolated the problem was incorrect and has been withdrawn.
-- Two controlled Oracle Java launches used new game directories instead of the established `run` directory. One loaded only vanilla, Fabric API, and this mod; the other enabled the same six resource packs listed by the failing launch. Both completed resource loading, initialized OpenAL and the sound engine, created the texture atlases, and remained at the main menu. These controls show that neither installing the mod nor enabling that resource-pack set deterministically reproduces the failure, but they do not disprove an intermittent native interaction.
-- The failing startup did not invoke an import or export action, so it did not submit an SDL file-dialog request. The shared dialog class is referenced by the client-stopping callback, while actual native dialog properties, filters, and request state are allocated only by an import/export call. This makes the dialog request path an unproven cause rather than a justified explanation for the startup crash.
-- Local IntelliJ run configurations were pointed at the installed Java 25 runtime to make development launches reproducible. Those ignored IDE settings are not mod source, are not included in release artifacts, and do not impose an additional end-user configuration. That runtime selection is a development convenience only and is not considered a crash fix.
-- A later launch logged `SSLHandshakeException: Remote host terminated the handshake` and `EOFException: SSL peer shut down incorrectly`. The complete stack identifies Minecraft's own `MinecraftServicesDiscoveryService` request to `https://discovery.minecraftservices.com/minecraft/client`, not the mod update checker. Resource loading, OpenAL initialization, sound-engine startup, and atlas creation continued afterward, so IntelliJ's error presentation did not represent a fatal client or mod startup failure. The associated development-account Realms authentication messages are likewise separate from the mod migration.
+- An initial development launch failed during Fabric Loom client-asset resolution because an expected cache object was absent.
+- Development launches intermittently terminated after SDL window creation, usually during initial resource loading, with Windows exit code `0xC0000005`. Windows Error Reporting recorded fault locations in `jvm.dll` and unknown addresses, plus a heap-corruption event in `ntdll.dll`. The events occurred with both JBR 25.0.2 and Oracle Java 25.0.2.
+- Two Oracle Java launches with new game directories completed resource loading, OpenAL initialization, sound-engine startup, and atlas creation. One used the base mod installation and the other enabled six resource packs. Both reached the main menu.
+- Set the local IntelliJ development run configurations to the installed Java 25 runtime.
+- A later launch logged `SSLHandshakeException` and `EOFException` during Minecraft's service discovery request to `https://discovery.minecraftservices.com/minecraft/client`. Resource loading, OpenAL initialization, sound-engine startup, and atlas creation completed afterward.
 
-### Verification record and remaining release gates
+### Verification record
 
-- `compileClientJava` has succeeded on the Minecraft 26.3 dependency set without deleting historical build outputs.
-- The development client has launched through Fabric Loader and Fabric API on Minecraft 26.3 and reached an interactive world with resources, sound, rendering, and the migrated screens available. After the intermittent native failures, controlled launches succeeded with a new game directory, with the previously enabled six-resource-pack set, and with the project's established `run` directory. No further native fatal occurred during the subsequent checks.
-- The packaged `1.5.1-beta` was then tested against the final Minecraft 26.3 release rather than only through the development launcher. It started successfully three consecutive times. A minimal normal-user installation containing only the required Fabric API dependency and this mod also started and ran normally.
-- The earlier native `0xC0000005`/heap-corruption events remain part of the development record because their exact cause was not established. Their failure to recur across the controlled launches and three consecutive packaged-beta launches permits a limited beta release, not a claim that the underlying native condition was conclusively repaired. Any reproducible recurrence blocks stable promotion and reopens the investigation.
-- Runtime testing confirmed that the SDL replacement opens the Windows file dialog and preserves the proposed filename and localized file-type filter. The first convenience-overload implementation had exposed only the generic Windows dialog title; the properties-based implementation restores the caller-supplied localized title path while retaining the same asynchronous selection result used by all three transfer families.
-- A source comparison against the retained `26.2` branch found and corrected an initial fullscreen-semantic regression before beta publication. Runtime checks confirmed the intended distinction: entering actual fullscreen disables transfer controls, while merely enabling the separate exclusive-fullscreen preference without entering fullscreen does not disable them. All nine button-state and action-entry guards use the general fullscreen state, matching the retained 26.2 behavior.
-- A normal-user migration rehearsal exercised the complete convenience path from the previous stable version into the 26.3 beta, including the established configuration, playlist, and custom track-name transfer families. The purpose was to verify that users can carry their prior data forward instead of recreating it manually; no new transfer format or migration-only behavior was introduced.
-- Beta publication is approved on this evidence. Stable `1.5.1` promotion is intentionally delayed for one week of observation. Promotion requires no reproducible native startup failure, no transfer-related data loss or format regression, and no newly reported behavioral difference from stable `1.4.4`. A beta publication does not authorize unrelated code changes, feature additions, or diagnostics during that observation period.
+- `compileClientJava` passed on the Minecraft 26.3 dependency set.
+- Development testing reached an interactive world on Minecraft 26.3 with resources, sound, rendering, and the migrated screens available. Startup tests succeeded with new game directories, the six-resource-pack set, and the established `run` directory.
+- Packaged `1.5.1-beta` testing on the final Minecraft 26.3 release completed three consecutive successful startups. A minimal installation containing Fabric API and this mod also started and ran successfully.
+- Runtime testing confirmed the Windows file dialog's default filename, localized file-type filter, and localized title. The properties-based implementation restored the title after the first convenience-overload implementation displayed the generic Windows dialog title.
+- Source comparison against the `26.2` branch identified a fullscreen-semantic regression, corrected before beta publication. Runtime tests confirmed that actual fullscreen disables file transfer and that the standalone exclusive-fullscreen preference preserves file-transfer availability. All nine button-state and action-entry guards check the general fullscreen state.
+- A migration rehearsal exercised configuration, playlist, and custom track-name transfers from the previous stable version to the 26.3 beta.
+- These tests met the beta publication criteria. Scheduled stable `1.5.1` promotion after a one-week observation period covering startup stability, transfer reliability, data integrity, and playback behavior.
+
+## 1.5.2-snapshot1
+
+**Status:** Development snapshot, October 2, 2026; compilation and packaged screen-closure pause testing completed; publication pending
+
+### Incremental snapshot development
+
+- Changed the development version from `1.5.2-beta1` to `1.5.2-snapshot1`. The `1.5.2` line uses incremental snapshots to present completed changes throughout development.
+- The first snapshot implements manual-playback pause protection and has completed packaged in-game testing.
+- Mod metadata and transfer metadata derive their version from the Gradle project version.
+
+### Manual pause during screen closure
+
+- Fixed unintended music resumption when closing a chest or returning from another screen to gameplay. The global sound-resume operation previously resumed manually paused music channels.
+- The previous tick-end check paused music after the global resume operation had already been queued, leaving a brief resume window.
+- Added per-instance filtering to the global resume path. It skips manually paused mod-owned channels and cancelled handles in the captured handle set, and resumes eligible vanilla channels.
+- The shared screen-closure resume path now handles pause protection for containers, inventory, chat, and configuration screens.
+- Pause and resume operations publish the instance's playback intent before queuing a native operation. The sound executor reads that intent when executing the task. Replaced the per-tick native pause retry with protection at global resume and asynchronous preparation. The paused-session tick branch checks for an ended session and returns before completion handling or automatic playlist advancement. Explicit manual pause queues the native pause operation.
+
+### Pause while audio is loading
+
+- Added logical manual-pause state to each music instance, covering loading, prepared, playing, and paused channel states. Pause requests take effect once the playback handle exists.
+- Static-buffer and streamed music callbacks associate preparation with the original instance and check pause and cancellation on the sound executor. Audio prepared during manual pause is attached to its channel and waits for explicit continuation.
+- Continuation handles three channel states: an already-started paused channel resumes from its current position; a prepared initial channel receives its first play operation; a loading channel starts after preparation completes and playback intent permits it. Repeated resume requests continue the current playback position.
+- Cancelled instances enter a terminal state. Late static-buffer results are discarded. Streamed results arriving after cancellation or handle release are closed on the sound executor. Attached streams are cleaned up by channel release; shared static buffers retain their shared lifecycle.
+
+### Session state initialization and cleanup
+
+- Starting a replacement track or a new single-track or playlist session initializes playback with manual pause cleared.
+- Stopping a session immediately clears the controller's manual-pause state, preparing it for a new session within the same tick.
+
+### Verification record
+
+- `compileClientJava --offline` passed using Java 25, Minecraft 26.3, Fabric Loader 0.19.5, and Fabric API `0.161.0+26.3`.
+- On October 2, packaged testing through a third-party launcher on Minecraft 26.3 with Fabric Loader 0.19.5 confirmed that manually paused music stays paused when closing a screen.
+
+### Development runtime alignment with a verified third-party launcher environment
+
+- On October 2, a development launch terminated after world entry with a Windows native access violation at Oracle Java 25.0.2 `jvm.dll + 0x9e7b97`. Used successful packaged testing through a third-party launcher as the reference environment for development launch configuration.
+- Aligned development startup with the reference environment: JetBrains Runtime 25.0.2, a 5 GiB maximum heap, G1 settings, and compact object headers. Added the Minecraft 26.3 manifest parameters `-XX:StackShadowPages=32` and the `java.base/jdk.internal.misc` export.
+- Configured both Gradle `runClient` and IntelliJ Minecraft Client with the aligned runtime. The local `dev-runtime.local.json` stores the Java executable and additional JVM parameters. Source launches use the Fabric development arguments and source classpath.
+- Copied 12 native-library files from the reference environment into an independent project-local directory. SHA-256 checks matched every copied file to its source. Configured the development native extraction paths to use that directory and backed up the original IntelliJ configuration under `.gradle/runtime-backups`.
+- After configuration, `compileClientJava --offline` passed and Gradle `runClient --offline` completed resource loading, OpenAL initialization, sound-engine startup, and atlas creation. Live JVM inspection confirmed JBR, the 5 GiB heap, G1, compact object headers, and `StackShadowPages=32`.

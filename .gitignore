@@ -19,3 +19,7 @@ hs_err_pid*
 
 # Common working directory
 run
+
+# Machine-local development launch settings
+dev-runtime.local.json
+/AGENTS.md

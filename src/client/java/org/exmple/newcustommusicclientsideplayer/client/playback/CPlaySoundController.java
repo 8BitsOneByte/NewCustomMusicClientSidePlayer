@@ -18,6 +18,7 @@ import org.exmple.newcustommusicclientsideplayer.client.bootstrap.Newcustommusic
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
 import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedbackMode;
 import org.exmple.newcustommusicclientsideplayer.client.customnowplayingtoast.CCustomNowPlayingToast;
+import org.exmple.newcustommusicclientsideplayer.client.playback.access.CCancellableChannelHandle;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
 import org.exmple.newcustommusicclientsideplayer.mixin.client.SoundEngineAccessor;
 import org.exmple.newcustommusicclientsideplayer.mixin.client.SoundManagerAccessor;
@@ -445,7 +446,6 @@ public final class CPlaySoundController {
                 return;
             }
 
-            pauseCurrentSound(client);
             return;
         }
 
@@ -477,6 +477,7 @@ public final class CPlaySoundController {
 
     private static void stopInternal(Minecraft client, boolean stopSound) {
         clearPlaylistSession();
+        customPaused = false;
 
         if (stopSound) {
             forceStopTrackedSound(client, "SESSION_STOP");
@@ -731,6 +732,7 @@ public final class CPlaySoundController {
 
         forceStopTrackedSound(client, "TRACK_REPLACED");
 
+        customPaused = false;
         lockMusicVolume(client);
         CManagedSoundInstance managedSound = new CManagedSoundInstance(
             soundId,
@@ -764,14 +766,14 @@ public final class CPlaySoundController {
     }
 
     private static boolean pauseCurrentSound(Minecraft client) {
-        return executeOnCurrentSoundChannel(client, channel -> channel.pause());
+        return setCurrentSoundPaused(client, true);
     }
 
     private static boolean resumeCurrentSound(Minecraft client) {
-        return executeOnCurrentSoundChannel(client, channel -> channel.unpause());
+        return setCurrentSoundPaused(client, false);
     }
 
-    private static boolean executeOnCurrentSoundChannel(Minecraft client, java.util.function.Consumer<com.mojang.blaze3d.audio.Channel> action) {
+    private static boolean setCurrentSoundPaused(Minecraft client, boolean paused) {
         CManagedSoundInstance currentSound = OWNED_SOUNDS.current();
         if (client == null || currentSound == null) {
             return false;
@@ -785,7 +787,15 @@ public final class CPlaySoundController {
             return false;
         }
 
-        channelHandle.execute(action);
+        // Publish intent before queuing native operations, including a deferred first start.
+        currentSound.setPlaybackPaused(paused);
+        customPaused = paused;
+        CCancellableChannelHandle controlled = (CCancellableChannelHandle) channelHandle;
+        if (paused) {
+            controlled.newcustommusicclientsideplayer$pauseManagedPlayback();
+        } else {
+            controlled.newcustommusicclientsideplayer$resumeManagedPlayback();
+        }
         return true;
     }
 

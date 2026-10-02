@@ -20,6 +20,11 @@ public abstract class ChannelAccessCancellationMixin implements CCancellableChan
     private Executor executor;
 
     @Override
+    public void newcustommusicclientsideplayer$executePlaybackTask(Runnable task) {
+        executor.execute(task);
+    }
+
+    @Override
     public void newcustommusicclientsideplayer$scheduleCancelledHandleRelease(
             ChannelAccess.ChannelHandle handle
     ) {

@@ -7,6 +7,8 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 
 public final class CManagedSoundInstance extends SimpleSoundInstance {
+    private volatile boolean playbackPaused;
+
     CManagedSoundInstance(
             Identifier identifier,
             SoundSource soundSource,
@@ -26,5 +28,13 @@ public final class CManagedSoundInstance extends SimpleSoundInstance {
 
     void setBaseVolume(float volume) {
         this.volume = volume;
+    }
+
+    public boolean isPlaybackPaused() {
+        return playbackPaused;
+    }
+
+    void setPlaybackPaused(boolean paused) {
+        playbackPaused = paused;
     }
 }

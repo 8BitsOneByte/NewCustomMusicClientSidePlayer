@@ -10,14 +10,36 @@ base {
     archivesName = project.archives_base_name
 }
 
+// Optional machine-local runtime settings, kept separate from distributable mod configuration.
+def devRuntimeFile = file('dev-runtime.local.json')
+def devRuntime = devRuntimeFile.exists()
+        ? new groovy.json.JsonSlurper().parse(devRuntimeFile)
+        : null
+
 loom {
     splitEnvironmentSourceSets()
+
+    runs {
+        client {
+            // Minecraft 26.3 declares these JVM requirements in its version manifest.
+            vmArgs '-XX:StackShadowPages=32', '--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED'
+            if (devRuntime != null) {
+                vmArgs devRuntime.jvmArgs
+            }
+        }
+    }
 
     mods {
         "newcustommusicclientsideplayer" {
             sourceSet sourceSets.main
             sourceSet sourceSets.client
         }
+    }
+}
+
+if (devRuntime != null) {
+    tasks.named('runClient', JavaExec).configure {
+        executable = new File(devRuntime.javaHome as String, 'bin/java.exe').absolutePath
     }
 }
 
