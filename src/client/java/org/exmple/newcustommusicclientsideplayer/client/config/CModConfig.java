@@ -6,8 +6,10 @@ public record CModConfig(
     boolean checkForUpdates,
     boolean nowPlayingToastEnabled,
     CNowPlayingFeedbackMode nowPlayingFeedbackMode,
-    int playbackVolumePercent
+    int playbackVolumePercent,
+    boolean keepPlayingInGameMenu
 ) {
+    public static final boolean DEFAULT_KEEP_PLAYING_IN_GAME_MENU = false;
     public static final boolean DEFAULT_CHECK_FOR_UPDATES = true;
     public static final boolean DEFAULT_NOW_PLAYING_TOAST_ENABLED = true;
     public static final CNowPlayingFeedbackMode DEFAULT_NOW_PLAYING_FEEDBACK_MODE = CNowPlayingFeedbackMode.CHAT;
@@ -26,7 +28,8 @@ public record CModConfig(
             DEFAULT_CHECK_FOR_UPDATES,
             DEFAULT_NOW_PLAYING_TOAST_ENABLED,
             DEFAULT_NOW_PLAYING_FEEDBACK_MODE,
-            DEFAULT_PLAYBACK_VOLUME_PERCENT
+            DEFAULT_PLAYBACK_VOLUME_PERCENT,
+            DEFAULT_KEEP_PLAYING_IN_GAME_MENU
         );
     }
 
@@ -35,7 +38,8 @@ public record CModConfig(
             enabled,
             this.nowPlayingToastEnabled,
             this.nowPlayingFeedbackMode,
-            this.playbackVolumePercent
+            this.playbackVolumePercent,
+            this.keepPlayingInGameMenu
         );
     }
 
@@ -44,7 +48,8 @@ public record CModConfig(
             this.checkForUpdates,
             enabled,
             this.nowPlayingFeedbackMode,
-            this.playbackVolumePercent
+            this.playbackVolumePercent,
+            this.keepPlayingInGameMenu
         );
     }
 
@@ -53,7 +58,8 @@ public record CModConfig(
             this.checkForUpdates,
             this.nowPlayingToastEnabled,
             mode,
-            this.playbackVolumePercent
+            this.playbackVolumePercent,
+            this.keepPlayingInGameMenu
         );
     }
 
@@ -62,7 +68,18 @@ public record CModConfig(
             this.checkForUpdates,
             this.nowPlayingToastEnabled,
             this.nowPlayingFeedbackMode,
-            playbackVolumePercent
+            playbackVolumePercent,
+            this.keepPlayingInGameMenu
+        );
+    }
+
+    public CModConfig withKeepPlayingInGameMenu(boolean enabled) {
+        return new CModConfig(
+            this.checkForUpdates,
+            this.nowPlayingToastEnabled,
+            this.nowPlayingFeedbackMode,
+            this.playbackVolumePercent,
+            enabled
         );
     }
 

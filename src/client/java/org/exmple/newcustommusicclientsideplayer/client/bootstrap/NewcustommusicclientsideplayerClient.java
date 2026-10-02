@@ -3,7 +3,6 @@ package org.exmple.newcustommusicclientsideplayer.client.bootstrap;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -137,7 +136,6 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
             while (NEXT_TRACK_KEY.consumeClick()) {
             }
         });
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> CPlaySoundController.stop());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             CFileDialogUtil.shutdown();
             CPlaySoundController.onClientStopping(client);

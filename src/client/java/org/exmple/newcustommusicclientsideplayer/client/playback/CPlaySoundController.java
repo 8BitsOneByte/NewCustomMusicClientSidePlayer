@@ -65,6 +65,8 @@ public final class CPlaySoundController {
     private static boolean playlistActive;
     private static String playlistName;
     private static boolean skipNextNowPlayingHeader;
+    // Client-thread scope for the temporary disconnect screen shown during an automatic transfer.
+    private static int serverTransferTeardownDepth;
     private static boolean musicVolumeLocked;
     private static double cachedMusicVolume;
     private static SessionMode lastSessionMode = SessionMode.NONE;
@@ -80,10 +82,6 @@ public final class CPlaySoundController {
 
     public static CManagedSoundInstance currentSoundForLevelChange() {
         return OWNED_SOUNDS.current();
-    }
-
-    public static boolean shouldKeepPlayingDuringLevelChange() {
-        return OWNED_SOUNDS.hasOwnedSounds() || playlistActive;
     }
 
     public static boolean hasActivePlayback() {
@@ -438,11 +436,20 @@ public final class CPlaySoundController {
     }
 
     public static void tick(Minecraft client) {
+        OWNED_SOUNDS.recoverRetiredSounds(client);
         if (client.level == null) {
+            OWNED_SOUNDS.releaseFinishedCurrent(client);
+            if (!OWNED_SOUNDS.hasCurrent()) {
+                customPaused = false;
+                if (playlistActive && !playlistLoop && playlistNextIndex >= playlistQueue.size()) {
+                    clearPlaylistSession();
+                }
+                if (!playlistActive) {
+                    unlockMusicVolume(client);
+                }
+            }
             return;
         }
-
-        OWNED_SOUNDS.recoverRetiredSounds(client);
 
         if (customPaused) {
             if (!hasActivePlayback()) {
@@ -473,6 +480,24 @@ public final class CPlaySoundController {
         }
 
         stopInternal(client, true);
+    }
+
+    public static void beginServerTransferTeardown() {
+        serverTransferTeardownDepth++;
+    }
+
+    public static void endServerTransferTeardown() {
+        serverTransferTeardownDepth--;
+    }
+
+    public static boolean isServerTransferTeardown() {
+        return serverTransferTeardownDepth > 0;
+    }
+
+    public static void onWorldDisconnect(Minecraft client, boolean transferring) {
+        if (!transferring && !NewcustommusicclientsideplayerClient.getModConfig().keepPlayingInGameMenu()) {
+            stopInternal(client, true);
+        }
     }
 
     public static void onClientStopping(Minecraft client) {

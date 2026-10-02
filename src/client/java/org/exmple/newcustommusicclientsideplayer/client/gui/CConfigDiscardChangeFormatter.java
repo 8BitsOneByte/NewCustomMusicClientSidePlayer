@@ -24,6 +24,8 @@ public final class CConfigDiscardChangeFormatter {
         Component.translatable("screen.custommusicclientsideplayer.mod_config.now_playing_feedback");
     private static final Component PLAYBACK_VOLUME =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.playback_volume");
+    private static final Component KEEP_PLAYING_IN_GAME_MENU =
+        Component.translatable("screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu");
 
     private CConfigDiscardChangeFormatter() {
     }
@@ -59,6 +61,14 @@ public final class CConfigDiscardChangeFormatter {
                 PLAYBACK_VOLUME,
                 percent(applied.playbackVolumePercent()),
                 percent(draft.playbackVolumePercent())
+            ));
+        }
+
+        if (applied.keepPlayingInGameMenu() != draft.keepPlayingInGameMenu()) {
+            changes.add(change(
+                KEEP_PLAYING_IN_GAME_MENU,
+                CommonComponents.optionStatus(applied.keepPlayingInGameMenu()),
+                CommonComponents.optionStatus(draft.keepPlayingInGameMenu())
             ));
         }
 

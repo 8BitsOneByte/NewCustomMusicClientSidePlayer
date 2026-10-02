@@ -23,6 +23,10 @@ public final class CModConfigEditSession {
         return !this.draft.equals(this.applied);
     }
 
+    public void setKeepPlayingInGameMenu(boolean enabled) {
+        this.draft = this.draft.withKeepPlayingInGameMenu(enabled);
+    }
+
     public void setCheckForUpdates(boolean enabled) {
         this.draft = this.draft.withCheckForUpdates(enabled);
     }

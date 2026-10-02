@@ -33,6 +33,10 @@ import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedba
 public final class CModConfigScreen extends Screen {
     private static final Component TITLE =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.title");
+    private static final Component KEEP_PLAYING_IN_GAME_MENU =
+        Component.translatable("screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu");
+    private static final Component KEEP_PLAYING_IN_GAME_MENU_TOOLTIP =
+        Component.translatable("screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu.tooltip");
     private static final Component CHECK_FOR_UPDATES =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.check_for_updates");
     private static final Component NOW_PLAYING_TOAST =
@@ -127,6 +131,7 @@ public final class CModConfigScreen extends Screen {
         new HeaderAndFooterLayout(this, HEADER_HEIGHT, FOOTER_HEIGHT);
 
     private StringWidget saveErrorWidget;
+    private CycleButton<Boolean> keepPlayingInGameMenuButton;
     private CycleButton<Boolean> checkForUpdatesButton;
     private CycleButton<Boolean> nowPlayingToastButton;
     private CycleButton<CNowPlayingFeedbackMode> nowPlayingFeedbackButton;
@@ -217,6 +222,15 @@ public final class CModConfigScreen extends Screen {
                     this.updateButtonStates();
                 }
             )
+        );
+        this.keepPlayingInGameMenuButton = rows.addChild(
+            CycleButton.onOffBuilder(this.editSession.draft().keepPlayingInGameMenu())
+                .withTooltip(enabled -> Tooltip.create(KEEP_PLAYING_IN_GAME_MENU_TOOLTIP))
+                .create(0, 0, OPTION_WIDTH, 20, KEEP_PLAYING_IN_GAME_MENU, (button, enabled) -> {
+                    this.editSession.setKeepPlayingInGameMenu(enabled);
+                    this.clearSaveError();
+                    this.updateButtonStates();
+                })
         );
         this.saveErrorWidget = rows.addChild(
             new StringWidget(CONTENT_WIDTH, this.font.lineHeight, Component.empty(), this.font),
@@ -588,6 +602,9 @@ public final class CModConfigScreen extends Screen {
     }
 
     private void syncOptionWidgets() {
+        if (this.keepPlayingInGameMenuButton != null) {
+            this.keepPlayingInGameMenuButton.setValue(this.editSession.draft().keepPlayingInGameMenu());
+        }
         if (this.checkForUpdatesButton != null) {
             this.checkForUpdatesButton.setValue(this.editSession.draft().checkForUpdates());
         }
@@ -609,6 +626,7 @@ public final class CModConfigScreen extends Screen {
 
     private static Component skippedFieldLabel(String field) {
         return switch (field) {
+            case "keepPlayingInGameMenu" -> KEEP_PLAYING_IN_GAME_MENU;
             case "checkForUpdates" -> CHECK_FOR_UPDATES;
             case "nowPlayingToastEnabled" -> NOW_PLAYING_TOAST;
             case "nowPlayingFeedbackMode" -> NOW_PLAYING_FEEDBACK;

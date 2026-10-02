@@ -27,6 +27,7 @@ public final class CModConfigTransferService {
     private static final String MINECRAFT_MOD_ID = "minecraft";
     private static final String CONFIG_KEY = "config";
     private static final String MOD_ID_KEY = "modId";
+    private static final String KEEP_PLAYING_IN_GAME_MENU_KEY = "keepPlayingInGameMenu";
     private static final String CHECK_FOR_UPDATES_KEY = "checkForUpdates";
     private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
     private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
@@ -124,6 +125,15 @@ public final class CModConfigTransferService {
         // - known fields with the expected type are imported;
         // - known fields with any other JSON type are skipped and reported;
         // - unknown fields, including formatVersion metadata, are ignored.
+        if (configObject.has(KEEP_PLAYING_IN_GAME_MENU_KEY)) {
+            JsonElement element = configObject.get(KEEP_PLAYING_IN_GAME_MENU_KEY);
+            if (element instanceof JsonPrimitive primitive && primitive.isBoolean()) {
+                compatibleConfig = compatibleConfig.withKeepPlayingInGameMenu(primitive.getAsBoolean());
+                hasCompatibleSettings = true;
+            } else {
+                skippedFields.add(KEEP_PLAYING_IN_GAME_MENU_KEY);
+            }
+        }
         if (configObject.has(CHECK_FOR_UPDATES_KEY)) {
             JsonElement element = configObject.get(CHECK_FOR_UPDATES_KEY);
             if (element instanceof JsonPrimitive primitive && primitive.isBoolean()) {

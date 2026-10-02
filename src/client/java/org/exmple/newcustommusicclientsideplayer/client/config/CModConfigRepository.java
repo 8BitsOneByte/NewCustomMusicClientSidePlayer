@@ -20,6 +20,7 @@ import org.exmple.newcustommusicclientsideplayer.client.bootstrap.Newcustommusic
 
 public final class CModConfigRepository {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final String KEEP_PLAYING_IN_GAME_MENU_KEY = "keepPlayingInGameMenu";
     private static final String CHECK_FOR_UPDATES_KEY = "checkForUpdates";
     private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
     private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
@@ -84,7 +85,8 @@ public final class CModConfigRepository {
                 NOW_PLAYING_FEEDBACK_MODE_KEY,
                 CModConfig.DEFAULT_NOW_PLAYING_FEEDBACK_MODE
             ),
-            playbackVolumePercent
+            playbackVolumePercent,
+            readBoolean(object, KEEP_PLAYING_IN_GAME_MENU_KEY, CModConfig.DEFAULT_KEEP_PLAYING_IN_GAME_MENU)
         );
         boolean migrationSaved = this.migrateMissingFields(object, config, normalizePlaybackVolume);
         if ((!playbackVolumeMissing && storedPlaybackVolume != null)
@@ -119,6 +121,7 @@ public final class CModConfigRepository {
         Objects.requireNonNull(config, "config");
 
         JsonObject root = new JsonObject();
+        root.addProperty(KEEP_PLAYING_IN_GAME_MENU_KEY, config.keepPlayingInGameMenu());
         root.addProperty(CHECK_FOR_UPDATES_KEY, config.checkForUpdates());
         root.addProperty(NOW_PLAYING_TOAST_ENABLED_KEY, config.nowPlayingToastEnabled());
         root.addProperty(NOW_PLAYING_FEEDBACK_MODE_KEY, config.nowPlayingFeedbackMode().name());
@@ -132,6 +135,10 @@ public final class CModConfigRepository {
         boolean normalizePlaybackVolume
     ) {
         boolean migrationNeeded = false;
+        if (!root.has(KEEP_PLAYING_IN_GAME_MENU_KEY)) {
+            root.addProperty(KEEP_PLAYING_IN_GAME_MENU_KEY, config.keepPlayingInGameMenu());
+            migrationNeeded = true;
+        }
         if (!root.has(CHECK_FOR_UPDATES_KEY)) {
             root.addProperty(CHECK_FOR_UPDATES_KEY, config.checkForUpdates());
             migrationNeeded = true;

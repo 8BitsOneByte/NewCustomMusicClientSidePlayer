@@ -230,7 +230,7 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 ### Incremental snapshot development
 
 - Changed the development version from `1.5.2-beta1` to `1.5.2-snapshot1`. The `1.5.2` line uses incremental snapshots to present completed changes throughout development.
-- The first snapshot implements manual-playback pause protection and selective sound cleanup during world changes. Packaged in-game testing has completed for screen-closure pause protection.
+- The first snapshot implements manual-playback pause protection, selective sound cleanup during world changes, and configurable playback continuation after disconnecting. In-game testing has completed for screen-closure pause protection and persistent elytra wind cleanup.
 - Mod metadata and transfer metadata derive their version from the Gradle project version.
 
 ### Manual pause during screen closure
@@ -263,10 +263,24 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 - Apply the same cleanup to elytra wind, biome and underwater ambience, minecart loops, entity-bound sounds, and other sounds from the departing world. Clearing the delayed and tickable queues also removes their scheduled restarts.
 - Preserve vanilla jukebox behavior across dimensions: world departure stops the local disc sound, while the server continues the song timer and note particles; returning follows vanilla playback-event handling to keep world audio faithful to the base game.
 
+### Playback continuation after disconnecting
+
+- Added **Keep Playing in Game Menu**, defaulting to OFF. The setting controls session retention when leaving a singleplayer world or ending a server connection to return to a selection screen. ON retains the current music instance, its playback position and manual-pause intent, and the playlist queue and indexes. OFF stops owned sounds, clears the session, and restores the saved vanilla music volume.
+- Apply the disconnect decision synchronously at client teardown, before pending client tasks are discarded. Replaced the unconditional Fabric disconnect-event stop with handling at the world-exit boundary, covering pause-menu exits, low-level connection closure, kicks, and connection loss.
+- Reconfiguration keeps the existing session while the connection moves through configuration and back into gameplay. Server-directed transfers also keep it while connecting to the destination. Scope the temporary transfer disconnect screen around its display operation and release that scope in a `finally` block.
+- Distinguish connection preparation with an already empty world from an ended connection. Address-resolution and login failures that return to a disconnect screen, and explicit cancellation of a connection attempt, apply the menu setting.
+- Extend selective world-sound cleanup to menu departure and transition paths where vanilla skips its stop operation. Retain the current valid music handle and release the other world sounds and delayed tasks.
+- During menu ticks, recover retired sounds and release a finished current instance. A playlist with remaining tracks or looping enabled retains the saved vanilla music-volume lock while waiting in the menu and resumes automatic advancement after entering a world. When the last track of a non-looping playlist finishes in the menu, clear the playlist session and restore the saved vanilla music volume immediately. A completed single track also restores that volume. A paused current instance keeps its pause intent throughout the transition.
+- Integrated the setting into configuration persistence, missing-field migration, import previews, export, Apply, draft discard, and reset to defaults. Existing configurations receive OFF for the new field; partial imports retain the current draft value when the field is absent. The discard-warning change list now includes the continuation setting, showing the applied and draft ON/OFF values in settings-screen order.
+- Added English and Simplified Chinese labels and hover descriptions, and standardized player address to “您” in the Simplified Chinese Tips & Tricks entries. The continuation toggle occupies one standard-width cell in the two-column settings grid; its Simplified Chinese label is “退出世界时保持音乐播放”.
+
 ### Verification record
 
 - `compileClientJava --offline` passed using Java 25, Minecraft 26.3, Fabric Loader 0.19.5, and Fabric API `0.161.0+26.3`.
 - On October 2, `compileClientJava --offline` passed after integrating selective world-change cleanup and execution-time cancellation checks for static and streamed sounds.
+- On October 2, `compileClientJava --offline` passed after integrating configurable disconnect continuation, automatic-transition handling, connection-failure and cancellation handling, and menu session maintenance. Language JSON validation passed for both locales.
+- On October 2, in-game testing confirmed that the current track continues after disconnecting and the retained playlist advances after re-entering a world. `compileClientJava --offline` passed after extending vanilla music suppression across the playlist's menu waiting period.
+- On October 2, `compileClientJava --offline` passed after adding menu-side completion handling for the final track of a non-looping playlist.
 - On October 2, in-game reproduction testing confirmed that elytra wind is cleared after an ender-pearl transfer through a Nether portal while mod music is playing, resolving the persistent wind sound after flight ends.
 - On October 2, packaged testing through a third-party launcher on Minecraft 26.3 with Fabric Loader 0.19.5 confirmed that manually paused music stays paused when closing a screen.
 
