@@ -8,7 +8,6 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import java.io.IOException;
 import java.io.Reader;
-import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -114,8 +113,7 @@ public final class CModConfigRepository {
 
     /**
      * Writes the complete configuration to a temporary file in the destination directory before replacing
-     * the live file. Keeping both files on the same file system allows an atomic move when supported; the
-     * fallback move is used only when the provider explicitly reports that atomic replacement is unavailable.
+     * the live file. Saving requires atomic replacement; unsupported atomic moves propagate as save failures.
      */
     public void save(CModConfig config) throws IOException {
         Objects.requireNonNull(config, "config");
@@ -208,6 +206,7 @@ public final class CModConfigRepository {
     }
 
     private void writeConfiguration(JsonObject root) throws IOException {
+        String json = GSON.toJson(root);
         Path parent = this.configPath.getParent();
         if (parent == null) {
             throw new IOException("Configuration path has no parent directory: " + this.configPath);
@@ -215,31 +214,22 @@ public final class CModConfigRepository {
 
         Files.createDirectories(parent);
         Path temporaryPath = Files.createTempFile(parent, "config-", ".tmp");
-        boolean replaced = false;
         try {
-            try (Writer writer = Files.newBufferedWriter(temporaryPath, StandardCharsets.UTF_8)) {
-                GSON.toJson(root, writer);
-            }
-
-            replaceConfigurationFile(temporaryPath);
-            replaced = true;
-        } finally {
-            if (!replaced) {
-                Files.deleteIfExists(temporaryPath);
-            }
-        }
-    }
-
-    private void replaceConfigurationFile(Path temporaryPath) throws IOException {
-        try {
+            Files.writeString(temporaryPath, json, StandardCharsets.UTF_8);
+            // Publish the complete document in one operation; unsupported atomic moves fail the save.
             Files.move(
                 temporaryPath,
                 this.configPath,
                 StandardCopyOption.ATOMIC_MOVE,
                 StandardCopyOption.REPLACE_EXISTING
             );
-        } catch (AtomicMoveNotSupportedException exception) {
-            Files.move(temporaryPath, this.configPath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException | RuntimeException | Error exception) {
+            try {
+                Files.deleteIfExists(temporaryPath);
+            } catch (IOException | RuntimeException cleanupException) {
+                exception.addSuppressed(cleanupException);
+            }
+            throw exception;
         }
     }
 

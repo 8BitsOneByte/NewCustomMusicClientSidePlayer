@@ -8,9 +8,7 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import java.io.IOException;
 import java.io.Reader;
-import java.io.Writer;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -140,8 +138,6 @@ public final class CTrackNameRepository {
     }
 
     private static void writeData(Map<String, String> names) throws IOException {
-        Files.createDirectories(FILE_PATH.getParent());
-
         JsonObject root = new JsonObject();
         JsonObject namesObject = new JsonObject();
         for (Map.Entry<String, String> entry : names.entrySet()) {
@@ -149,24 +145,20 @@ public final class CTrackNameRepository {
         }
 
         root.add("trackNames", namesObject);
+        String json = GSON.toJson(root);
+        Files.createDirectories(FILE_PATH.getParent());
         Path temporaryFile = Files.createTempFile(FILE_PATH.getParent(), "track_names-", ".tmp");
         try {
-            try (Writer writer = Files.newBufferedWriter(temporaryFile, StandardCharsets.UTF_8)) {
-                GSON.toJson(root, writer);
-            }
-
+            Files.writeString(temporaryFile, json, StandardCharsets.UTF_8);
+            // Publish the complete document in one operation; unsupported atomic moves fail the save.
+            Files.move(temporaryFile, FILE_PATH, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException | RuntimeException | Error exception) {
             try {
-                Files.move(
-                    temporaryFile,
-                    FILE_PATH,
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING
-                );
-            } catch (AtomicMoveNotSupportedException ignored) {
-                Files.move(temporaryFile, FILE_PATH, StandardCopyOption.REPLACE_EXISTING);
+                Files.deleteIfExists(temporaryFile);
+            } catch (IOException | RuntimeException cleanupException) {
+                exception.addSuppressed(cleanupException);
             }
-        } finally {
-            Files.deleteIfExists(temporaryFile);
+            throw exception;
         }
     }
 

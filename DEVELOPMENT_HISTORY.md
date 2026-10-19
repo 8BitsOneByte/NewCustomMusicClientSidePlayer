@@ -291,3 +291,32 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 - Configured both Gradle `runClient` and IntelliJ Minecraft Client with the aligned runtime. The local `dev-runtime.local.json` stores the Java executable and additional JVM parameters. Source launches use the Fabric development arguments and source classpath.
 - Copied 12 native-library files from the reference environment into an independent project-local directory. SHA-256 checks matched every copied file to its source. Configured the development native extraction paths to use that directory and backed up the original IntelliJ configuration under `.gradle/runtime-backups`.
 - After configuration, `compileClientJava --offline` passed and Gradle `runClient --offline` completed resource loading, OpenAL initialization, sound-engine startup, and atlas creation. Live JVM inspection confirmed JBR, the 5 GiB heap, G1, compact object headers, and `StackShadowPages=32`.
+
+## 1.5.2-snapshot2
+
+**Status:** In development, October 3, 2026
+
+### Atomic playlist-file replacement
+
+- Replaced direct truncation and rewriting of `playlists.json` with a complete-document save through a unique temporary file in the same directory. Playlist creation, deletion, reordering, editing, and import share this storage path.
+- Serialize the complete playlist document before creating the temporary file. Write the JSON as UTF-8 and close the file before publishing it through an atomic move to `playlists.json`.
+- Require atomic replacement for the save to succeed. An unsupported atomic move or a failed replacement reports a save failure while preserving the previous playlist file.
+- On failure, remove the temporary file created by that save. Attach a temporary-file cleanup failure to the original exception so diagnostics retain the primary cause. A successful move consumes the temporary file.
+- Advanced the development version to `1.5.2-snapshot2`; mod and transfer metadata continue deriving their version from the Gradle project version.
+
+### Atomic configuration and custom track-name replacement
+
+- Applied the same mandatory atomic replacement policy to `config.json` and `track_names.json`. Both stores serialize their complete JSON before writing a unique UTF-8 temporary file in the destination directory, then publish the completed file with an atomic move.
+- Unsupported atomic replacement propagates as a save failure through the existing caller error handling. Configuration Apply retains the editable draft and the latest applied baseline after a failed save; track-name edits publish the updated in-memory names after successful persistence.
+- Temporary-file cleanup failures are attached to the original save exception. This retains both the primary failure and cleanup diagnostics for configuration and track-name saves.
+
+### Java runtime requirement
+
+- Declared Java 25 or newer in `fabric.mod.json`, aligning the loader dependency check with the Java 25 compilation target and Minecraft 26.3 runtime requirement.
+
+### Verification record
+
+- On October 3, `compileClientJava --offline` passed using Java 25, Minecraft 26.3, Fabric Loader 0.19.5, and Fabric API `0.161.0+26.3`.
+- Generated `fabric.mod.json` contains version `1.5.2-snapshot2`. Source review checked all playlist write callers, the serialization-before-replacement order, and propagation of replacement and temporary-file cleanup failures.
+- On October 3, `compileClientJava --offline` passed after applying mandatory atomic replacement to configuration and custom track names. Source review covered failed Apply retaining the draft and applied baseline, Back/Esc discard warnings, Keep Editing, explicit discard, applying then editing again, reset and imported drafts, and all five configuration fields in the discard formatter and widget synchronization.
+- On October 3, `compileClientJava --offline` passed after declaring the Java runtime dependency. Generated `fabric.mod.json` contains `"java": ">=25"`.
