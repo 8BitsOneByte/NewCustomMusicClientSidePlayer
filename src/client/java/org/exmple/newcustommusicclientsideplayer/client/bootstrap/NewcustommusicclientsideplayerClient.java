@@ -15,6 +15,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
+import org.exmple.newcustommusicclientsideplayer.client.audio.catalog.CAudioCatalog;
+import org.exmple.newcustommusicclientsideplayer.client.audio.catalog.CAudioCatalogReloadListener;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigRepository;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
@@ -137,6 +139,7 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
             }
         });
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            CAudioCatalog.getInstance().close();
             CFileDialogUtil.shutdown();
             CPlaySoundController.onClientStopping(client);
             if (modConfigSavePending) {
@@ -156,6 +159,11 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
                         CPlaySoundController.stop();
                     }
                 }
+        );
+
+        ResourceLoader.get(PackType.CLIENT_RESOURCES).registerReloadListener(
+                Identifier.fromNamespaceAndPath(MOD_ID, "audio_catalog"),
+                new CAudioCatalogReloadListener(CAudioCatalog.getInstance())
         );
 
         CUpdateChecker.initialize(modConfig.checkForUpdates());

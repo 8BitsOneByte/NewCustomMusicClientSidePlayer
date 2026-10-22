@@ -19,6 +19,7 @@ import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
 import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedbackMode;
 import org.exmple.newcustommusicclientsideplayer.client.customnowplayingtoast.CCustomNowPlayingToast;
 import org.exmple.newcustommusicclientsideplayer.client.playback.access.CCancellableChannelHandle;
+import org.exmple.newcustommusicclientsideplayer.client.playback.access.CVanillaMusicControl;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
 import org.exmple.newcustommusicclientsideplayer.mixin.client.SoundEngineAccessor;
 import org.exmple.newcustommusicclientsideplayer.mixin.client.SoundManagerAccessor;
@@ -67,8 +68,6 @@ public final class CPlaySoundController {
     private static boolean skipNextNowPlayingHeader;
     // Client-thread scope for the temporary disconnect screen shown during an automatic transfer.
     private static int serverTransferTeardownDepth;
-    private static boolean musicVolumeLocked;
-    private static double cachedMusicVolume;
     private static SessionMode lastSessionMode = SessionMode.NONE;
     private static int playbackVolumePercent = CModConfig.DEFAULT_PLAYBACK_VOLUME_PERCENT;
     private static boolean customPaused;
@@ -86,6 +85,10 @@ public final class CPlaySoundController {
 
     public static boolean hasActivePlayback() {
         return OWNED_SOUNDS.hasOwnedSounds() || playlistActive;
+    }
+
+    public static boolean shouldSuppressVanillaMusic() {
+        return OWNED_SOUNDS.hasCurrent() || playlistActive;
     }
 
     public static boolean isCustomPaused() {
@@ -208,7 +211,7 @@ public final class CPlaySoundController {
 
         if (customPaused) {
             if (!resumeCurrentSound(client)) {
-                customPaused = false;
+                stopInternal(client, true);
                 return PauseResult.NO_PLAYBACK;
             }
 
@@ -233,7 +236,7 @@ public final class CPlaySoundController {
         }
 
         if (!resumeCurrentSound(client)) {
-            customPaused = false;
+            stopInternal(client, true);
             return PauseResult.NO_PLAYBACK;
         }
 
@@ -348,7 +351,6 @@ public final class CPlaySoundController {
         if (!playPlaylistIndex(client, startQueueIndex)) {
             clearPlaylistSession();
             source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound").withStyle(ChatFormatting.RED));
-            unlockMusicVolume(client);
             return 0;
         }
 
@@ -422,7 +424,6 @@ public final class CPlaySoundController {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.no_playable_sound"));
             }
 
-            unlockMusicVolume(client);
             return 0;
         }
 
@@ -437,37 +438,26 @@ public final class CPlaySoundController {
 
     public static void tick(Minecraft client) {
         OWNED_SOUNDS.recoverRetiredSounds(client);
-        if (client.level == null) {
-            OWNED_SOUNDS.releaseFinishedCurrent(client);
-            if (!OWNED_SOUNDS.hasCurrent()) {
-                customPaused = false;
-                if (playlistActive && !playlistLoop && playlistNextIndex >= playlistQueue.size()) {
-                    clearPlaylistSession();
-                }
-                if (!playlistActive) {
-                    unlockMusicVolume(client);
-                }
-            }
-            return;
-        }
-
-        if (customPaused) {
-            if (!hasActivePlayback()) {
-                customPaused = false;
-                return;
-            }
-
-            return;
-        }
-
+        // A paused instance may have lost its channel during a sound-engine reload.
         OWNED_SOUNDS.releaseFinishedCurrent(client);
-
-        if (!OWNED_SOUNDS.hasCurrent() && playlistActive && playNextInPlaylist(client)) {
+        if (customPaused) {
+            if (!OWNED_SOUNDS.hasCurrent()) {
+                // End the invalid paused session instead of starting another playlist track.
+                stopInternal(client, true);
+            }
             return;
         }
 
-        if (musicVolumeLocked && !OWNED_SOUNDS.hasCurrent() && !playlistActive) {
-            unlockMusicVolume(client);
+        if (client.level == null) {
+            if (!OWNED_SOUNDS.hasCurrent() && playlistActive && !playlistLoop
+                    && playlistNextIndex >= playlistQueue.size()) {
+                clearPlaylistSession();
+            }
+            return;
+        }
+
+        if (!OWNED_SOUNDS.hasCurrent() && playlistActive) {
+            playNextInPlaylist(client);
         }
     }
 
@@ -511,29 +501,6 @@ public final class CPlaySoundController {
         if (stopSound) {
             forceStopTrackedSound(client, "SESSION_STOP");
         }
-
-        unlockMusicVolume(client);
-    }
-
-    private static void lockMusicVolume(Minecraft client) {
-        if (musicVolumeLocked) {
-            return;
-        }
-
-        cachedMusicVolume = client.options.getSoundSourceVolume(SoundSource.MUSIC);
-        client.options.getSoundSourceOptionInstance(SoundSource.MUSIC).set(0.0);
-        musicVolumeLocked = true;
-    }
-
-    private static void unlockMusicVolume(Minecraft client) {
-        if (!musicVolumeLocked) {
-            return;
-        }
-
-        client.options.getSoundSourceOptionInstance(SoundSource.MUSIC).set(cachedMusicVolume);
-        client.options.save();
-        musicVolumeLocked = false;
-        cachedMusicVolume = 1.0;
     }
 
     private static void clearPlaylistSession() {
@@ -762,7 +729,6 @@ public final class CPlaySoundController {
         forceStopTrackedSound(client, "TRACK_REPLACED");
 
         customPaused = false;
-        lockMusicVolume(client);
         CManagedSoundInstance managedSound = new CManagedSoundInstance(
             soundId,
             SoundSource.MASTER,
@@ -778,7 +744,13 @@ public final class CPlaySoundController {
             true
         );
         OWNED_SOUNDS.activate(managedSound);
-        soundManager.play(managedSound);
+        // Publish the session before stopping vanilla music or submitting asynchronous audio loading.
+        ((CVanillaMusicControl) client.getMusicManager())
+                .newcustommusicclientsideplayer$stopForManagedPlayback();
+        if (soundManager.play(managedSound) == SoundEngine.PlayResult.NOT_STARTED) {
+            OWNED_SOUNDS.releaseCurrent(client);
+            return false;
+        }
         showCustomNowPlayingToast(client, soundId);
         return true;
     }

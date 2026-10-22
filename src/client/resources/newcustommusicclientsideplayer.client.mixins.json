@@ -10,6 +10,7 @@
     "GuiDisconnectPolicyMixin",
     "ConnectScreenCancellationMixin",
     "MinecraftPauseSoundMixin",
+    "MusicManagerMixin",
     "SoundEngineAsyncPlaybackMixin",
     "SoundEngineAccessor",
     "SoundManagerAccessor"
