@@ -8,7 +8,7 @@ import java.util.Objects;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
 
 public final class CPlaylistTransferData {
-    public static final int CURRENT_FORMAT_VERSION = 1;
+    public static final int CURRENT_FORMAT_VERSION = CPlaylistFormat.CURRENT_VERSION;
 
     private int formatVersion = CURRENT_FORMAT_VERSION;
     private String modId = NewcustommusicclientsideplayerClient.MOD_ID;
@@ -57,15 +57,21 @@ public final class CPlaylistTransferData {
     }
 
     public static final class Playlist {
+        private CTrackSourceType sourceType;
         private List<String> tracks = new ArrayList<>();
         private long modifiedAt;
 
         Playlist() {
         }
 
-        public Playlist(List<String> tracks, long modifiedAt) {
+        public Playlist(CTrackSourceType sourceType, List<String> tracks, long modifiedAt) {
+            this.sourceType = Objects.requireNonNull(sourceType, "sourceType");
             this.tracks = new ArrayList<>(Objects.requireNonNull(tracks, "tracks"));
             this.modifiedAt = modifiedAt;
+        }
+
+        public CTrackSourceType sourceType() {
+            return this.sourceType;
         }
 
         public List<String> tracks() {

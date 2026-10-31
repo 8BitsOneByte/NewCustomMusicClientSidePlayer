@@ -307,10 +307,7 @@ public class CPlaylistTestScreen extends Screen {
         List<Identifier> snapshot = List.copyOf(this.playlist);
         CompletableFuture.runAsync(() -> {
             try {
-                CPlaylistRepository.savePlaylist(newPlaylistName, snapshot);
-                if (!Objects.equals(newPlaylistName, this.playlistName)) {
-                    CPlaylistRepository.deletePlaylist(this.playlistName);
-                }
+                CPlaylistRepository.renameSoundEventPlaylist(this.playlistName, newPlaylistName, snapshot);
             } catch (IOException exception) {
                 throw new RuntimeException(exception);
             }

@@ -234,7 +234,7 @@ public final class CPlaylistCommand {
                 return 0;
             }
 
-            playlist = CPlaylistRepository.getPlaylist(normalizedName);
+            playlist = CPlaylistRepository.getSoundEventPlaylist(normalizedName);
         } catch (IOException exception) {
             source.sendError(Component.translatable("screen.custommusicclientsideplayer.error.read_playlist_failed"));
             return 0;
@@ -285,7 +285,7 @@ public final class CPlaylistCommand {
                 return 0;
             }
 
-            initialPlaylist = CPlaylistRepository.getPlaylist(normalizedName);
+            initialPlaylist = CPlaylistRepository.getSoundEventPlaylist(normalizedName);
         } catch (IOException exception) {
             source.sendError(Component.translatable("screen.custommusicclientsideplayer.error.open_playlist_failed"));
             return 0;

@@ -512,7 +512,7 @@ public class CPlaylistConfigScreen extends Screen {
         String playlistName = selectedSummary.name();
         List<Identifier> playlist;
         try {
-            playlist = CPlaylistRepository.getPlaylist(playlistName);
+            playlist = CPlaylistRepository.getSoundEventPlaylist(playlistName);
         } catch (IOException exception) {
             if (this.minecraft.player != null) {
                 this.minecraft.player.sendSystemMessage(Component.translatable("screen.custommusicclientsideplayer.error.read_playlist_failed"));
@@ -544,7 +544,7 @@ public class CPlaylistConfigScreen extends Screen {
         String playlistName = selectedSummary.name();
         List<Identifier> initialPlaylist;
         try {
-            initialPlaylist = CPlaylistRepository.getPlaylist(playlistName);
+            initialPlaylist = CPlaylistRepository.getSoundEventPlaylist(playlistName);
         } catch (IOException exception) {
             if (this.minecraft.player != null) {
                 this.minecraft.player.sendSystemMessage(Component.translatable("screen.custommusicclientsideplayer.error.open_playlist_failed"));
@@ -673,7 +673,7 @@ public class CPlaylistConfigScreen extends Screen {
     private void openViewPlaylistTracks(String playlistName) {
         List<Identifier> tracks;
         try {
-            tracks = CPlaylistRepository.getPlaylist(playlistName);
+            tracks = CPlaylistRepository.getSoundEventPlaylist(playlistName);
         } catch (IOException exception) {
             if (this.minecraft.player != null) {
                 this.minecraft.player.sendSystemMessage(Component.translatable("screen.custommusicclientsideplayer.error.open_playlist_tracks_failed"));

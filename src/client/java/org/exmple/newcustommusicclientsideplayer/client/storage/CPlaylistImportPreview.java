@@ -89,10 +89,12 @@ public final class CPlaylistImportPreview {
 
     public static final class PlaylistToImport {
         private final String name;
+        private final CTrackSourceType sourceType;
         private final List<Identifier> tracks;
         private final long modifiedAt;
 
-        public PlaylistToImport(String name, List<Identifier> tracks, long modifiedAt) {
+        public PlaylistToImport(String name, CTrackSourceType sourceType, List<Identifier> tracks, long modifiedAt) {
+            this.sourceType = Objects.requireNonNull(sourceType, "sourceType");
             this.name = Objects.requireNonNull(name, "name");
             this.tracks = List.copyOf(Objects.requireNonNull(tracks, "tracks"));
             this.modifiedAt = modifiedAt;
@@ -100,6 +102,10 @@ public final class CPlaylistImportPreview {
 
         public String name() {
             return this.name;
+        }
+
+        public CTrackSourceType sourceType() {
+            return this.sourceType;
         }
 
         public List<Identifier> tracks() {
