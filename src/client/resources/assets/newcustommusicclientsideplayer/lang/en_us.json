@@ -299,6 +299,10 @@
   "screen.custommusicclientsideplayer.update.latest_version": "Latest Version: %s",
   "screen.custommusicclientsideplayer.update.updated_at": "Last Updated At: %s",
   "screen.custommusicclientsideplayer.update.changelog": "Changelog:",
+  "screen.custommusicclientsideplayer.mod_config.track_source": "Track Source",
+  "screen.custommusicclientsideplayer.mod_config.track_source.sound_events": "Sound Events",
+  "screen.custommusicclientsideplayer.mod_config.track_source.ogg_files": "Ogg Files",
+  "screen.custommusicclientsideplayer.mod_config.track_source.tooltip": "%1$s may reference multiple sound files per track, while %2$s reference a single sound file per track.",
   "screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu": "Keep Playing in Game Menu",
   "screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu.tooltip": "When enabled, disconnecting from a singleplayer world or a server preserves your current music session, allowing the current track to continue playing. Automatic playlist advancement is suspended while you are in the game menus and resumes when you enter a world or join a server."
 }

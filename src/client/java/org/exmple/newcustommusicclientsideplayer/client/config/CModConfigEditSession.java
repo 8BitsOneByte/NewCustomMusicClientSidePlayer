@@ -1,6 +1,7 @@
 package org.exmple.newcustommusicclientsideplayer.client.config;
 
 import java.util.Objects;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 
 public final class CModConfigEditSession {
     private CModConfig applied;
@@ -37,6 +38,10 @@ public final class CModConfigEditSession {
 
     public void setNowPlayingFeedbackMode(CNowPlayingFeedbackMode mode) {
         this.draft = this.draft.withNowPlayingFeedbackMode(mode);
+    }
+
+    public void setDefaultTrackSource(CTrackSourceType sourceType) {
+        this.draft = this.draft.withDefaultTrackSource(sourceType);
     }
 
     public void setPlaybackVolumePercent(int playbackVolumePercent) {

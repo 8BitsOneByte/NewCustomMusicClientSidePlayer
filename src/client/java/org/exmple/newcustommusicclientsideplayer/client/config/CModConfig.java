@@ -1,14 +1,17 @@
 package org.exmple.newcustommusicclientsideplayer.client.config;
 
 import java.util.Objects;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 
 public record CModConfig(
     boolean checkForUpdates,
     boolean nowPlayingToastEnabled,
     CNowPlayingFeedbackMode nowPlayingFeedbackMode,
     int playbackVolumePercent,
-    boolean keepPlayingInGameMenu
+    boolean keepPlayingInGameMenu,
+    CTrackSourceType defaultTrackSource
 ) {
+    public static final CTrackSourceType DEFAULT_TRACK_SOURCE = CTrackSourceType.OGG_RESOURCE;
     public static final boolean DEFAULT_KEEP_PLAYING_IN_GAME_MENU = false;
     public static final boolean DEFAULT_CHECK_FOR_UPDATES = true;
     public static final boolean DEFAULT_NOW_PLAYING_TOAST_ENABLED = true;
@@ -20,6 +23,7 @@ public record CModConfig(
 
     public CModConfig {
         Objects.requireNonNull(nowPlayingFeedbackMode, "nowPlayingFeedbackMode");
+        Objects.requireNonNull(defaultTrackSource, "defaultTrackSource");
         playbackVolumePercent = clampPlaybackVolumePercent(playbackVolumePercent);
     }
 
@@ -29,7 +33,8 @@ public record CModConfig(
             DEFAULT_NOW_PLAYING_TOAST_ENABLED,
             DEFAULT_NOW_PLAYING_FEEDBACK_MODE,
             DEFAULT_PLAYBACK_VOLUME_PERCENT,
-            DEFAULT_KEEP_PLAYING_IN_GAME_MENU
+            DEFAULT_KEEP_PLAYING_IN_GAME_MENU,
+            DEFAULT_TRACK_SOURCE
         );
     }
 
@@ -39,7 +44,8 @@ public record CModConfig(
             this.nowPlayingToastEnabled,
             this.nowPlayingFeedbackMode,
             this.playbackVolumePercent,
-            this.keepPlayingInGameMenu
+            this.keepPlayingInGameMenu,
+            this.defaultTrackSource
         );
     }
 
@@ -49,7 +55,8 @@ public record CModConfig(
             enabled,
             this.nowPlayingFeedbackMode,
             this.playbackVolumePercent,
-            this.keepPlayingInGameMenu
+            this.keepPlayingInGameMenu,
+            this.defaultTrackSource
         );
     }
 
@@ -59,7 +66,8 @@ public record CModConfig(
             this.nowPlayingToastEnabled,
             mode,
             this.playbackVolumePercent,
-            this.keepPlayingInGameMenu
+            this.keepPlayingInGameMenu,
+            this.defaultTrackSource
         );
     }
 
@@ -69,7 +77,8 @@ public record CModConfig(
             this.nowPlayingToastEnabled,
             this.nowPlayingFeedbackMode,
             playbackVolumePercent,
-            this.keepPlayingInGameMenu
+            this.keepPlayingInGameMenu,
+            this.defaultTrackSource
         );
     }
 
@@ -79,7 +88,19 @@ public record CModConfig(
             this.nowPlayingToastEnabled,
             this.nowPlayingFeedbackMode,
             this.playbackVolumePercent,
-            enabled
+            enabled,
+            this.defaultTrackSource
+        );
+    }
+
+    public CModConfig withDefaultTrackSource(CTrackSourceType sourceType) {
+        return new CModConfig(
+            this.checkForUpdates,
+            this.nowPlayingToastEnabled,
+            this.nowPlayingFeedbackMode,
+            this.playbackVolumePercent,
+            this.keepPlayingInGameMenu,
+            sourceType
         );
     }
 

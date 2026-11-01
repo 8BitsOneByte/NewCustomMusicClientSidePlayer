@@ -16,6 +16,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 import net.fabricmc.loader.api.FabricLoader;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 
 public final class CModConfigRepository {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -24,6 +25,7 @@ public final class CModConfigRepository {
     private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
     private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
     private static final String PLAYBACK_VOLUME_PERCENT_KEY = "playbackVolumePercent";
+    private static final String DEFAULT_TRACK_SOURCE_KEY = "defaultTrackSource";
     private static final String LEGACY_PLAYBACK_VOLUME_FILE_NAME = "playback_volume.json";
     private static final String MIGRATED_PLAYBACK_VOLUME_FILE_NAME = "playback_volume.json.migrated";
 
@@ -45,19 +47,22 @@ public final class CModConfigRepository {
     }
 
     public CModConfig load() {
+        if (Files.notExists(this.configPath)) {
+            return this.initializeWithoutConfig();
+        }
         if (!Files.isRegularFile(this.configPath)) {
-            return this.migrateLegacyVolumeWithoutConfig();
+            return this.legacyDefaults();
         }
 
         JsonElement root;
         try (Reader reader = Files.newBufferedReader(this.configPath, StandardCharsets.UTF_8)) {
             root = JsonParser.parseReader(reader);
         } catch (IOException | RuntimeException exception) {
-            return CModConfig.defaults().withPlaybackVolumePercent(this.readLegacyPlaybackVolume());
+            return this.legacyDefaults();
         }
 
         if (!(root instanceof JsonObject object)) {
-            return CModConfig.defaults().withPlaybackVolumePercent(this.readLegacyPlaybackVolume());
+            return this.legacyDefaults();
         }
 
         boolean playbackVolumeMissing = !object.has(PLAYBACK_VOLUME_PERCENT_KEY);
@@ -85,7 +90,8 @@ public final class CModConfigRepository {
                 CModConfig.DEFAULT_NOW_PLAYING_FEEDBACK_MODE
             ),
             playbackVolumePercent,
-            readBoolean(object, KEEP_PLAYING_IN_GAME_MENU_KEY, CModConfig.DEFAULT_KEEP_PLAYING_IN_GAME_MENU)
+            readBoolean(object, KEEP_PLAYING_IN_GAME_MENU_KEY, CModConfig.DEFAULT_KEEP_PLAYING_IN_GAME_MENU),
+            readDefaultTrackSource(object)
         );
         boolean migrationSaved = this.migrateMissingFields(object, config, normalizePlaybackVolume);
         if ((!playbackVolumeMissing && storedPlaybackVolume != null)
@@ -95,20 +101,35 @@ public final class CModConfigRepository {
         return config;
     }
 
-    private CModConfig migrateLegacyVolumeWithoutConfig() {
-        CModConfig config = CModConfig.defaults();
-        if (!Files.isRegularFile(this.legacyPlaybackVolumePath)) {
-            return config;
-        }
-
-        config = config.withPlaybackVolumePercent(this.readLegacyPlaybackVolume());
+    private CModConfig initializeWithoutConfig() {
+        CModConfig config = CModConfig.defaults()
+            .withDefaultTrackSource(this.hasExistingUserData()
+                ? CTrackSourceType.SOUND_EVENT : CTrackSourceType.OGG_RESOURCE)
+            .withPlaybackVolumePercent(this.readLegacyPlaybackVolume());
         try {
             this.save(config);
             this.retireLegacyPlaybackVolumeFile();
         } catch (IOException | RuntimeException ignored) {
-            // The in-memory legacy value remains usable and migration will be retried next launch.
         }
         return config;
+    }
+
+    private CModConfig legacyDefaults() {
+        return CModConfig.defaults().withDefaultTrackSource(CTrackSourceType.SOUND_EVENT)
+            .withPlaybackVolumePercent(this.readLegacyPlaybackVolume());
+    }
+
+    private boolean hasExistingUserData() {
+        for (String name : new String[]{
+            "playlists.json", "playlists.json.migrated",
+            "track_names.json", "track_names.json.migrated",
+            LEGACY_PLAYBACK_VOLUME_FILE_NAME, MIGRATED_PLAYBACK_VOLUME_FILE_NAME
+        }) {
+            if (!Files.notExists(this.configPath.resolveSibling(name))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -124,6 +145,7 @@ public final class CModConfigRepository {
         root.addProperty(NOW_PLAYING_TOAST_ENABLED_KEY, config.nowPlayingToastEnabled());
         root.addProperty(NOW_PLAYING_FEEDBACK_MODE_KEY, config.nowPlayingFeedbackMode().name());
         root.addProperty(PLAYBACK_VOLUME_PERCENT_KEY, config.playbackVolumePercent());
+        root.addProperty(DEFAULT_TRACK_SOURCE_KEY, config.defaultTrackSource().name());
         this.writeConfiguration(root);
     }
 
@@ -133,6 +155,10 @@ public final class CModConfigRepository {
         boolean normalizePlaybackVolume
     ) {
         boolean migrationNeeded = false;
+        if (!root.has(DEFAULT_TRACK_SOURCE_KEY)) {
+            root.addProperty(DEFAULT_TRACK_SOURCE_KEY, config.defaultTrackSource().name());
+            migrationNeeded = true;
+        }
         if (!root.has(KEEP_PLAYING_IN_GAME_MENU_KEY)) {
             root.addProperty(KEEP_PLAYING_IN_GAME_MENU_KEY, config.keepPlayingInGameMenu());
             migrationNeeded = true;
@@ -239,6 +265,17 @@ public final class CModConfigRepository {
             return primitive.getAsBoolean();
         }
         return defaultValue;
+    }
+
+    private static CTrackSourceType readDefaultTrackSource(JsonObject object) {
+        JsonElement element = object.get(DEFAULT_TRACK_SOURCE_KEY);
+        if (element instanceof JsonPrimitive primitive && primitive.isString()) {
+            try {
+                return CTrackSourceType.valueOf(primitive.getAsString());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return CTrackSourceType.SOUND_EVENT;
     }
 
     private static Integer readInteger(JsonObject object, String key) {

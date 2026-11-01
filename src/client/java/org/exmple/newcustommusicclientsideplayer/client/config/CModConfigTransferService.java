@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Objects;
 import net.fabricmc.loader.api.FabricLoader;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 
 public final class CModConfigTransferService {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -32,6 +33,7 @@ public final class CModConfigTransferService {
     private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
     private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
     private static final String PLAYBACK_VOLUME_PERCENT_KEY = "playbackVolumePercent";
+    private static final String DEFAULT_TRACK_SOURCE_KEY = "defaultTrackSource";
 
     public String defaultFileName() {
         return sanitizeFileName(modName()) + "-" + sanitizeFileName(modVersion()) + "-config.txt";
@@ -174,6 +176,16 @@ public final class CModConfigTransferService {
             }
         }
 
+        if (configObject.has(DEFAULT_TRACK_SOURCE_KEY)) {
+            CTrackSourceType sourceType = readDefaultTrackSource(configObject.get(DEFAULT_TRACK_SOURCE_KEY));
+            if (sourceType != null) {
+                compatibleConfig = compatibleConfig.withDefaultTrackSource(sourceType);
+                hasCompatibleSettings = true;
+            } else {
+                skippedFields.add(DEFAULT_TRACK_SOURCE_KEY);
+            }
+        }
+
         if (!hasCompatibleSettings) {
             throw CConfigImportException.noCompatibleSettings();
         }
@@ -189,6 +201,16 @@ public final class CModConfigTransferService {
         if (element instanceof JsonPrimitive primitive && primitive.isString()) {
             try {
                 return CNowPlayingFeedbackMode.valueOf(primitive.getAsString());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static CTrackSourceType readDefaultTrackSource(JsonElement element) {
+        if (element instanceof JsonPrimitive primitive && primitive.isString()) {
+            try {
+                return CTrackSourceType.valueOf(primitive.getAsString());
             } catch (IllegalArgumentException ignored) {
             }
         }

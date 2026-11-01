@@ -299,6 +299,10 @@
   "screen.custommusicclientsideplayer.update.latest_version": "最新版本: %s",
   "screen.custommusicclientsideplayer.update.updated_at": "最近更新于: %s",
   "screen.custommusicclientsideplayer.update.changelog": "更新日志:",
+  "screen.custommusicclientsideplayer.mod_config.track_source": "曲目来源",
+  "screen.custommusicclientsideplayer.mod_config.track_source.sound_events": "声音事件",
+  "screen.custommusicclientsideplayer.mod_config.track_source.ogg_files": "Ogg文件",
+  "screen.custommusicclientsideplayer.mod_config.track_source.tooltip": "%1$s模式的一首曲目可能包含多个声音文件，而%2$s模式的一首曲目只对应一个声音文件。",
   "screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu": "退出世界时保持音乐播放",
   "screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu.tooltip": "若此项打开，当您从单人世界或服务器断开连接时，现有实例会继续播放。但是，播放列表的自动切歌可能无法正常工作，直到您进入一个单人世界或服务器。"
 }

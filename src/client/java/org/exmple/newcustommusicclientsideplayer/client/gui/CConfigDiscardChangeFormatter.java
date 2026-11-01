@@ -8,6 +8,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
 import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedbackMode;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 
 /** Formats unapplied configuration differences in the same order as the config screen. */
 public final class CConfigDiscardChangeFormatter {
@@ -26,6 +27,8 @@ public final class CConfigDiscardChangeFormatter {
         Component.translatable("screen.custommusicclientsideplayer.mod_config.playback_volume");
     private static final Component KEEP_PLAYING_IN_GAME_MENU =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu");
+    private static final Component TRACK_SOURCE =
+        Component.translatable("screen.custommusicclientsideplayer.mod_config.track_source");
 
     private CConfigDiscardChangeFormatter() {
     }
@@ -72,6 +75,14 @@ public final class CConfigDiscardChangeFormatter {
             ));
         }
 
+        if (applied.defaultTrackSource() != draft.defaultTrackSource()) {
+            changes.add(change(
+                TRACK_SOURCE,
+                trackSourceLabel(applied.defaultTrackSource()),
+                trackSourceLabel(draft.defaultTrackSource())
+            ));
+        }
+
         return List.copyOf(changes);
     }
 
@@ -94,5 +105,12 @@ public final class CConfigDiscardChangeFormatter {
 
     private static Component percent(int value) {
         return Component.translatable(PERCENT_KEY, value);
+    }
+
+    static Component trackSourceLabel(CTrackSourceType sourceType) {
+        return Component.translatable(switch (sourceType) {
+            case SOUND_EVENT -> "screen.custommusicclientsideplayer.mod_config.track_source.sound_events";
+            case OGG_RESOURCE -> "screen.custommusicclientsideplayer.mod_config.track_source.ogg_files";
+        });
     }
 }
