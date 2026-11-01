@@ -409,6 +409,8 @@ public class CPlaylistConfigScreen extends Screen {
     private void openImportExceptionScreen(CPlaylistImportException exception) {
         switch (exception.reason()) {
             case IO_ERROR -> this.openImportMessageScreen(IMPORT_IO_ERROR_TITLE, IMPORT_IO_ERROR_BODY);
+            case UNSUPPORTED_VERSION -> this.openImportMessageScreen(IMPORT_INVALID_TITLE,
+                Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_unsupported.body"));
             case INVALID_PLAYLIST_FILE -> this.openImportMessageScreen(IMPORT_INVALID_TITLE, IMPORT_INVALID_BODY);
             case NO_COMPATIBLE_PLAYLISTS -> this.openImportMessageScreen(
                 IMPORT_NO_COMPATIBLE_TITLE,
@@ -449,7 +451,13 @@ public class CPlaylistConfigScreen extends Screen {
                         this.minecraft.gui.setScreen(this);
                     }
                 }
-            ));
+            ) {
+                @Override
+                protected Component formatListItem(Component item) {
+                    return item.getString().isEmpty() || CPlaylistImportWarningFormatter.isSourceHeading(item)
+                        ? item : super.formatListItem(item);
+                }
+            });
         }
     }
 

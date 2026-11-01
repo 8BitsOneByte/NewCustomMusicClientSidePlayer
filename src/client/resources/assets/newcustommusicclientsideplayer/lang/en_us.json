@@ -250,6 +250,8 @@
   "screen.custommusicclientsideplayer.playlist_transfer.import_invalid.body": "The selected file is not a valid NewCustomMusicClientSidePlayer playlist export. Please choose a playlist file exported by this mod.",
   "screen.custommusicclientsideplayer.playlist_transfer.import_no_compatible.title": "No Importable Playlists Found",
   "screen.custommusicclientsideplayer.playlist_transfer.import_no_compatible.body": "This file does not contain any playlists that can be imported by the current version.",
+  "screen.custommusicclientsideplayer.playlist_transfer.warning.source_type": "Source Type: %s",
+  "screen.custommusicclientsideplayer.playlist_transfer.import_unsupported.body": "The selected file version is not supported",
   "screen.custommusicclientsideplayer.playlist_transfer.warning.skipped_playlists": "Skipped playlists: %s",
   "screen.custommusicclientsideplayer.playlist_transfer.warning.unreadable_track_lists": "Unreadable track lists:",
   "screen.custommusicclientsideplayer.playlist_transfer.warning.invalid_tracks": "Invalid tracks:",

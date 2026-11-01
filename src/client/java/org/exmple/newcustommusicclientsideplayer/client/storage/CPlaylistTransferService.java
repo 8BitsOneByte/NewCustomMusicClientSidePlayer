@@ -132,7 +132,7 @@ public final class CPlaylistTransferService {
                 String name = jsonReader.nextName();
                 if ("formatVersion".equals(name)) {
                     if (versionSeen) {
-                        throw CPlaylistImportException.invalidPlaylistFile();
+                        throw CPlaylistImportException.unsupportedVersion();
                     }
                     versionSeen = true;
                     formatVersion = JsonParser.parseReader(jsonReader);
@@ -164,6 +164,9 @@ public final class CPlaylistTransferService {
 
             return new ParsedTransferFile(modId, playlists, CPlaylistFormat.version(formatVersion));
         } catch (CPlaylistStorageException exception) {
+            if (exception.reason() == CPlaylistStorageException.Reason.UNSUPPORTED_VERSION) {
+                throw CPlaylistImportException.unsupportedVersion();
+            }
             throw CPlaylistImportException.invalidPlaylistFile(exception);
         } catch (JsonParseException | IllegalStateException | MalformedJsonException exception) {
             throw CPlaylistImportException.invalidPlaylistFile(exception);

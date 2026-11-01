@@ -250,6 +250,8 @@
   "screen.custommusicclientsideplayer.playlist_transfer.import_invalid.body": "所选文件不是有效的新版客户端自定义音乐播放器播放列表导出文件。请选择由此模组导出的播放列表文件。",
   "screen.custommusicclientsideplayer.playlist_transfer.import_no_compatible.title": "未找到可导入的播放列表",
   "screen.custommusicclientsideplayer.playlist_transfer.import_no_compatible.body": "此文件中没有当前版本可以导入的播放列表。",
+  "screen.custommusicclientsideplayer.playlist_transfer.warning.source_type": "来源类型：%s",
+  "screen.custommusicclientsideplayer.playlist_transfer.import_unsupported.body": "所选导出文件的版本不属于当前的支持范围",
   "screen.custommusicclientsideplayer.playlist_transfer.warning.skipped_playlists": "跳过的播放列表：%s 个",
   "screen.custommusicclientsideplayer.playlist_transfer.warning.unreadable_track_lists": "曲目列表无法解析：",
   "screen.custommusicclientsideplayer.playlist_transfer.warning.invalid_tracks": "无法解析的曲目：",
