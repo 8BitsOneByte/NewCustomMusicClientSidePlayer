@@ -144,11 +144,11 @@
   "screen.custommusicclientsideplayer.view_tracks.empty": "(空播放列表)",
   "screen.custommusicclientsideplayer.view_tracks.empty_narration": "空播放列表",
   "screen.custommusicclientsideplayer.view_tracks.track_order": "%s. %s",
-  "screen.custommusicclientsideplayer.view_tracks.description": "来自 %s 的音乐文件",
+  "screen.custommusicclientsideplayer.view_tracks.music_file_from": "来自 %s 的音乐文件",
   "screen.custommusicclientsideplayer.common.unknown_namespace_track": "该曲目来自未知命名空间",
   "screen.custommusicclientsideplayer.common.unplayable_track": "该曲目当前无法播放，可能已被从资源包中移除或重命名。",
 
-  "screen.custommusicclientsideplayer.common.music_files_from": "来自 %s 的音乐文件",
+  "screen.custommusicclientsideplayer.common.music_file_from": "来自 %s 的音乐文件",
 
   "screen.custommusicclientsideplayer.main_menu.title": "新版客户端自定义音乐播放器",
   "screen.custommusicclientsideplayer.main_menu.mod_name": "新版客户端自定义音乐播放器",
@@ -312,5 +312,5 @@
   "command.custommusicclientsideplayer.track_source.already": "曲目来源已经为%s！",
   "command.custommusicclientsideplayer.track_source.current": "当前曲目来源：%s",
   "screen.custommusicclientsideplayer.singletrack.track_source": "曲目来源：",
-  "screen.custommusicclientsideplayer.common.sound_events_from": "来自 %s 的声音事件"
+  "screen.custommusicclientsideplayer.common.sound_event_from": "来自 %s 的声音事件"
 }

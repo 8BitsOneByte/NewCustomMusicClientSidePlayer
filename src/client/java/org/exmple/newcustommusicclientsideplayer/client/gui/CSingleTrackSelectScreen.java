@@ -10,7 +10,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
+import java.util.regex.Pattern;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -121,6 +122,7 @@ public final class CSingleTrackSelectScreen extends Screen {
     private Button renameTrackButton;
     private Button restoreTrackNameButton;
     private String filter = "";
+    private Pattern searchPattern;
 
     public CSingleTrackSelectScreen(Screen parent) {
         super(TITLE);
@@ -398,16 +400,38 @@ public final class CSingleTrackSelectScreen extends Screen {
             return;
         }
 
-        String currentFilter = this.filter.toLowerCase(Locale.ROOT);
+        this.searchPattern = this.filter.isBlank() ? null
+            : Pattern.compile("(?=(" + Pattern.quote(this.filter) + "))", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
         String namespace = this.getCurrentNamespace();
         List<Identifier> visible = this.allSounds.stream()
             .filter(id -> id.getNamespace().equals(namespace))
-            .filter(id -> currentFilter.isBlank()
-                || id.getPath().toLowerCase(Locale.ROOT).contains(currentFilter)
-                || CTrackNameRepository.getDisplayName(this.sourceType, id).toLowerCase(Locale.ROOT).contains(currentFilter))
+            .filter(id -> this.searchPattern == null
+                || this.searchPattern.matcher(id.getPath()).find()
+                || this.searchPattern.matcher(CTrackNameRepository.getDisplayName(this.sourceType, id)).find())
             .toList();
         this.soundSelectionList.setEntries(visible);
         this.updateButtonStates();
+    }
+
+    private Component highlightedName(Identifier id) {
+        String name = this.getDisplayName(id);
+        if (this.searchPattern == null) return Component.literal(name);
+        boolean[] highlighted = new boolean[name.length()];
+        var matches = this.searchPattern.matcher(name);
+        while (matches.find()) {
+            java.util.Arrays.fill(highlighted, matches.start(1), matches.end(1), true);
+        }
+        MutableComponent result = Component.empty();
+        int start = 0;
+        while (start < name.length()) {
+            int end = start + 1;
+            while (end < name.length() && highlighted[end] == highlighted[start]) end++;
+            MutableComponent part = Component.literal(name.substring(start, end));
+            if (highlighted[start]) part.withStyle(ChatFormatting.GREEN);
+            result.append(part);
+            start = end;
+        }
+        return result;
     }
 
     private void updateButtonStates() {
@@ -832,7 +856,7 @@ public final class CSingleTrackSelectScreen extends Screen {
                 guiGraphics.blit(RenderPipelines.GUI_TEXTURED, icon, this.getContentX(), this.getContentY(), 0.0F, 0.0F, 32, 32, 32, 32);
 
                 int textX = this.getContentX() + 34;
-                guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, CSingleTrackSelectScreen.this.getDisplayName(this.id)), textX, this.getContentY() + 1,
+                guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, CSingleTrackSelectScreen.this.highlightedName(this.id)), textX, this.getContentY() + 1,
                     CTrackNameRepository.getCustomName(CSingleTrackSelectScreen.this.sourceType, this.id) == null
                         ? COLOR_TEXT_WHITE : 0xFFFFFF55, false);
                 guiGraphics.text(font, buildDescription(this.id), textX, this.getContentY() + 12, COLOR_TEXT_GRAY, false);
@@ -860,8 +884,8 @@ public final class CSingleTrackSelectScreen extends Screen {
             private Component buildDescription(Identifier id) {
                 return Component.translatable(
                     CSingleTrackSelectScreen.this.sourceType == CTrackSourceType.OGG_RESOURCE
-                        ? "screen.custommusicclientsideplayer.common.music_files_from"
-                        : "screen.custommusicclientsideplayer.common.sound_events_from",
+                        ? "screen.custommusicclientsideplayer.common.music_file_from"
+                        : "screen.custommusicclientsideplayer.common.sound_event_from",
                     Component.literal(id.getNamespace()).withStyle(style -> style.withBold(true))
                 );
             }

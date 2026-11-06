@@ -314,9 +314,166 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 
 - Declared Java 25 or newer in `fabric.mod.json`, aligning the loader dependency check with the Java 25 compilation target and Minecraft 26.3 runtime requirement.
 
+### Vanilla music playback suppression
+
+- Replaced the MUSIC-category volume lock with playback suppression in the vanilla music manager. The previous implementation cached the MUSIC slider, forced it to zero during a custom session, and restored the cached value afterward. The new implementation leaves the configured MUSIC volume intact throughout the session.
+- Suppress both the vanilla manager's scheduled tick and its direct music-start operation while a current managed track or active playlist session exists. A manually paused track remains part of that session, as does a retained playlist waiting between tracks or for world entry.
+- Publish the new managed instance as the current session before stopping vanilla music and submitting asynchronous audio loading. This establishes suppression before a competing vanilla start can be scheduled.
+- Stop the vanilla manager's currently tracked music when a custom session starts. Cancel its channel before stopping it so a static buffer or streamed load that finishes late cannot restart that music; request release of the cancelled handle afterward.
+- Use the vanilla stop operation to clear the tracked instance, dismiss its music toast, and reset the normal scheduling delay. Once the custom session ends, ordinary music scheduling continues under the existing MUSIC setting rather than restoring a cached slider value.
+- Target the vanilla music manager's scheduling and tracked instance rather than muting every sound in a category. Managed playback continues to use MASTER, combining Minecraft's master gain with the mod's independent playback-volume percentage.
+- This replaces the volume-lock behavior described for snapshot1, including its retained-playlist menu waiting period. The session itself now determines suppression during playback, manual pause, and menu continuation.
+
+### Invalid paused-session cleanup
+
+- Move finished-instance recovery ahead of the manually paused early-return branch. A paused session can lose its channel when the sound engine or output device reloads.
+- If recovery finds that the paused session no longer has a current instance, stop and clear the session instead of keeping an invalid pause alive. An invalid paused playlist is ended rather than automatically advancing to another track.
+- Clearing that invalid session also releases vanilla-music suppression. Valid paused instances continue to retain their pause intent through the established screen, world, and menu transitions.
+
+### Effective OGG resource catalog and background metadata
+
+- Added a catalog of effective `sounds/**/*.ogg` resources from Minecraft's active resource manager, including vanilla assets and enabled resource packs. Discovery covers files independently of whether a registered sound event refers to them.
+- Catalog entries retain the complete resource ID, namespace, and supplying resource-pack ID. Resource-manager priority resolves identical IDs to their effective resource before indexing; different IDs remain distinct entries.
+- Provide shared queries for all resources, namespace groups, a resource's entry, and scan progress. Namespace and resource collections belong to one catalog generation, while individual metadata results can become available progressively.
+- Resource reload prepares a complete new ID/source directory and publishes it during the apply phase. Queries then see the complete new directory immediately, with metadata initially pending, rather than a partially enumerated list or stale durations presented as current.
+- Parse metadata sequentially on one daemon worker. The worker retains at most one active job and the latest pending job, replacing superseded pending work rather than building an unbounded queue.
+- The parser's explicitly allocated buffers total 328,505 bytes and are checked against a 1 MiB working-buffer limit. Catalog storage grows with resource count; compressed files and decoded PCM are not retained as a full audio cache.
+- Read Ogg pages incrementally, checking capture patterns, version and flags, page sequence, packet continuation, checksums, and granule progression. Identify Vorbis headers, sample rate, and channel count; derive duration from the final sample count divided by the sample rate, without decoding the audio to PCM.
+- Record `PENDING`, `READY`, `INVALID`, `UNSUPPORTED`, or `IO_ERROR` per resource. Chained or multiplexed streams outside the supported single-stream layout receive the unsupported result; a failure for one resource does not stop the remaining scan.
+- Reuse immutable resource IDs and source strings from the preceding directory where possible, and share identical source strings within the new directory. Reparse metadata on every reload so a file replaced at the same resource ID cannot inherit its previous duration.
+- Cancel obsolete generations, close the active input stream on cancellation, and discard results whose job no longer matches the requested and published generation. Every resource stream is closed after its parse attempt, including failure and cancellation.
+- A failed reload cancels that generation's metadata work. Client shutdown closes the catalog, invalidates outstanding generations, closes the active stream, and shuts down the worker.
+- Keep this catalog in memory for the current resource lifecycle. Playback streams are opened separately when a track is played; the catalog does not write a disk metadata cache.
+
+### Versioned playlists and source-aware storage
+
+- Introduced playlist format version 2 for local storage and exports. Each playlist owns one `sourceType`, either `SOUND_EVENT` or `OGG_RESOURCE`, together with its ordered `tracks` and `modifiedAt` value. Its tracks share that source instead of carrying mixed per-entry source types.
+- Treat an absent format version as legacy version 1. Legacy lists remain sound-event lists; version 2 requires a recognized explicit source type. OGG IDs include the `sounds/` prefix and `.ogg` suffix, while both source types require syntactically valid, nonempty identifier paths.
+- Migrate readable legacy playlists into the versioned local document and add their source type. Both legacy track arrays and object-based lists are supported. Missing local modification times fall back to the nonnegative file modification time during migration.
+- Preserve the original local file bytes in `playlists.json.migrated` before publishing the migrated file. Reuse an identical existing archive; a different existing archive causes migration to fail without replacing either stored file.
+- Distinguish a missing file, ready data, partially readable data, an unsupported version, invalid data, and I/O failure. Reading a missing file produces an empty in-memory document; creating or saving data publishes the versioned file.
+- Block ordinary storage operations after a whole-document read failure instead of exposing empty data that a later save could write over the source. This protection is shared by graphical and command callers.
+- Keep readable playlists usable when other entries cannot be interpreted. Preserve unreadable entries in the raw JSON, retain their names as occupied, and reject attempts to edit them through the typed playlist API. Readable summaries contain the lists that can be interpreted.
+- Preserve unknown root data, unreadable list entries, and unedited object members when changing a readable list. Export carries the raw playlist collection, including entries that are retained without a typed representation.
+- Keep legacy event-only edit paths source-checked so an OGG resource ID cannot be reinterpreted and saved as an event ID through those paths.
+- Make rename a single storage operation that preserves list order and checks the target name before publishing. Import checks every destination name against the current stored document and publishes the merged batch once, preventing an earlier preview from overwriting a name created afterward.
+- Compare the source file's bytes with the bytes originally read before replacement. A detected external edit or deletion rejects the save. Migration repeats this comparison after archiving and before the atomic replacement.
+- The versioned stores retain the complete-document atomic replacement policy. Their later implementations serialize the document while preparing the temporary file and compare the original source before publication, extending the earlier snapshot2 replacement mechanism with version, migration, and external-change protection.
+
+### Playlist transfer compatibility and filtering
+
+- Default playlist exports to version 2 and include each list's source type. The reader accepts legacy exports and version 2, while a positive integral version above the supported range rejects the entire import. Invalid version declarations also reject the file.
+- Preserve the existing partial-import behavior within a supported format. Skip a list whose name is empty or longer than 50 characters, or whose source type cannot be interpreted, and continue with compatible lists.
+- Trim playlist names and preserve exact case-sensitive collision rules. Existing names and earlier names in the same import reserve their spelling; conflicting imports receive `(2)`, `(3)`, and subsequent available numeric suffixes, shortening the base if needed to stay within 50 characters.
+- Validate track ID syntax and the selected source's ID shape. Discard invalid entries with the existing preview details while preserving valid entries and their order. Do not discard a syntactically valid track merely because its resource pack or event is currently absent.
+- Continue to accept normal empty playlists. Missing `tracks` produces an empty list without a dedicated track-array warning; a present non-array value produces an unreadable-track-list warning. Filtering every invalid track out still leaves an importable empty playlist.
+- Missing or invalid imported modification times use zero and retain the existing time warning. Nonnegative future timestamps remain supported without a comparison to the export time or current clock.
+- An empty collection, or a collection whose lists are all skipped, opens the no-compatible-playlists error rather than a partial-import confirmation. A valid empty playlist still counts as an importable list.
+- Retain streaming-parser behavior for duplicate top-level `playlists` and `modId` fields: later readable values replace earlier readable values, while wrong-type values are skipped. Repeated playlist names inside one collection are processed as separate entries and enter automatic renaming.
+
+### Preferred track source and installation compatibility
+
+- Added the `defaultTrackSource` configuration field with Sound Events and Ogg Files choices. A new installation without previous mod data defaults to OGG resources; established installations retain sound-event behavior until the preference is changed.
+- A valid stored source choice takes priority. An existing configuration with the field missing receives `SOUND_EVENT`; an invalid source value also falls back to that compatible mode.
+- When the configuration file is absent, check for `playlists.json`, `track_names.json`, `playback_volume.json`, and each corresponding `.migrated` file before choosing the initial source. Any existing or not-confirmed-absent legacy-data path selects sound events. Persist the initial choice during configuration initialization.
+- An unreadable, non-file, or non-object main configuration uses compatible sound-event defaults during loading. Initialization determines existing-data evidence before creating a new configuration or retiring old volume data.
+- Added the setting to the editable draft, dirty-state comparison, persistence, missing-field repair, configuration export, partial import, reset, and widget synchronization. Imported values change the draft; an absent or invalid imported field retains its existing draft value through the established preview flow.
+- Include source changes in the unapplied-change list as the applied value followed by the draft value. Back and Esc use the existing discard flow, Keep Editing preserves the draft, and successful Apply establishes the baseline used by later edits and explicit discard.
+- Applying the settings draft publishes its source preference through the existing configuration flow. The setting tooltip distinguishes an event that can select among several sound files from a direct OGG selection that identifies one file; its source names use green and gold respectively.
+
+### Source-grouped playlist import warnings
+
+- Group recoverable playlist-import details by source, with Ogg Files before Sound Events. Source headings use a gray prefix, gold for Ogg Files, and green for Sound Events, reusing the localized source labels.
+- Show a source section only when that source has warnings. Compatible lists without warning details are still included in the same confirmed import, even when their source heading is absent.
+- Keep the skipped-playlist count above the source sections as a global summary. An unknown source or an unusable list name can prevent a reliable source assignment, so those skipped entries are not forced into either known-source section.
+- Retain the existing unreadable-array, invalid-ID, empty-ID, invalid-time, and automatic-renaming details inside each source section. Playlist names remain aqua, invalid entries remain red, and category text remains gray.
+- Omit the ordinary bullet prefix from source headings and blank separators. Use the shared short-message panel or scrollable long-message layout according to the wrapped content length.
+- Distinguish an unsupported future version or repeated `formatVersion` declaration from other invalid-file causes in the error body. Both retain the existing invalid-playlist-file title; the specialized English body is `The selected file version is not supported`, with its Simplified Chinese counterpart. Other invalid structures and invalid version values retain the established generic body.
+- Preview does not query resource availability, wait for catalog metadata, or decode audio. Resource installation and audio metadata states do not add import warning categories.
+
+### Versioned custom names for both track sources
+
+- Upgraded local custom-name storage and default exports to format version 2. The single `track_names.json` file now stores `trackNames` groups keyed by `SOUND_EVENT` and `OGG_RESOURCE`, and each group maps complete resource IDs to custom names.
+- Treat old unversioned local name maps and version 1 as sound-event mappings. Migrate a valid legacy map into the event group, preserving other root data, and save the original bytes in `track_names.json.migrated` before atomically publishing version 2.
+- Require valid identifiers and nonempty string names of at most 50 characters for automatic local legacy migration. An invalid old file is retained and blocks name persistence and export rather than being replaced with empty data.
+- Preserve an existing migration archive. An identical archive can be reused; a conflicting archive prevents replacement. An unsupported local future version or load failure likewise blocks rename, restore, import, and export through the repository's write protection.
+- Make name lookup, custom-name detection, rename, restoration, and batch import source-aware. The same resource-ID string can have independent event and OGG names. Existing event-only callers retain event semantics.
+- Keep the complete local JSON when changing known entries. Editing an event name carries OGG data, unknown source groups, and other unedited fields into the replacement. An unreadable known-source group cannot be replaced by a typed edit, while another readable group can still be edited.
+- Default exports carry the grouped name document. Imports accept both the older flat mapping and the new grouped mapping; old external exports are interpreted as event names and merged into versioned local storage without rewriting the selected external file.
+- Evaluate each known source's candidates against its own available and stored names. Retain the existing non-string, empty, overlong, default-name, duplicate-ID, same-namespace name-conflict, and local-name-replacement checks. IDs repeated within one source are all skipped; the same ID in different sources is independent.
+- Import known groups together in one batch. A failure while validating or saving any group prevents publication of the batch. Unchanged mappings do not trigger another save, and the repository compares the original bytes before replacement to reject detected external edits.
+- Group name-import details by OGG and then sound events, showing only source sections that have warning details. Count unknown source groups above those sections, display `Unknown track source groups; skipped (%s):` or its Simplified Chinese translation, and list their original field names in red.
+- Skip external unknown source groups while retaining compatible known mappings. This import filtering is separate from preserving unknown groups already present in local storage. A known group with a non-object structure, a repeated source-group declaration, or an unsupported file version rejects the external file.
+- If no compatible names remain, use the existing no-compatible-names screen and include the collected problem details. Cancel and Esc return without applying the imported mappings.
+
+### Direct OGG playback and source-aware commands
+
+- Added direct OGG resolution to the managed sound instance. Convert the complete `namespace:sounds/path.ogg` resource ID to the sound engine's file-location form by removing only the `sounds/` prefix and `.ogg` suffix for the sound descriptor; its resource lookup resolves back to that complete file.
+- Construct one file candidate with unit base gain, unit base pitch, weight one, streaming enabled, and preloading disabled. The existing playback-volume percentage and requested pitch are applied by the managed instance, and streaming is used regardless of an event definition's settings.
+- Adapt direct resolution to Minecraft 26.3's `getOrResolve(SoundManager)` contract and populate both the selected sound and its sound-event representation. This corrects the method mismatch with earlier Minecraft APIs and supplies the state queried by the 26.3 sound engine.
+- Use event registration to check sound-event candidates and effective resource presence to check OGG candidates. A catalog metadata result is not a prerequisite for attempting direct playback; resource loading and the sound engine handle the selected file.
+- Added `/tracksource`, `/tracksource sound_events`, and `/tracksource ogg_files`, with literal-argument completion. The no-argument form reports the current preference; selecting the active value reports that it is already set; changing it reports the new source.
+- Command feedback uses white surrounding text and the localized settings source name, green for sound events or gold for OGG files. A source change saves the new configuration first and then applies it to runtime state. A failed save reports the existing configuration-save error and leaves the active preference intact.
+- `/cplaysound` and its `/playtrack` alias resolve and suggest tracks from the chosen source. OGG suggestions use complete resource IDs, or namespace-qualified custom names when present. Alias resolution also considers the displayed default name and requires a unique matching resource; direct available IDs take priority.
+- Capture the source for each started session. Changing the preferred source affects subsequent command playback without reinterpreting the current track, its display name, or a running playlist queue.
+- Extend `/playlist play` to read each stored list's source type, require it to match the selected command source, and pass that type to playable-track filtering, queue construction, and playback. Playback-name completion includes lists from that source, and random starting-index selection tests candidates with the same source rules.
+- Preserve original display indexes after filtering unavailable entries from the playback queue. Non-looping playback requires a playable entry at or after the requested start; looping playback can wrap to an earlier playable entry. Pause, resume, relative and random skips, looping, and shuffle continue through the managed queue.
+
+### OGG single-track browsing and playback
+
+- Connected the single-track selection screen to the applied track-source setting. Each browser instance captures its source when opened and uses that source throughout selection, playback confirmation, renaming, and restoration. Opening a new browser uses the latest applied source.
+- Sound-event mode lists registered sound events; OGG mode lists effective OGG resource IDs from the audio catalog. Both modes retain the namespace selector, sorted namespace options, search field, and established single-track controls.
+- Added a two-line source indicator at the upper left of the browser header. The first line is white and reads `Track Source:` in English or its Simplified Chinese equivalent. The second line is left-aligned and reuses the settings label, with Sound Events in green and Ogg Files in gold.
+- Single-track playback confirmation passes the browser's captured source together with the selected resource ID, loop choice, and pitch to the playback controller. The OGG path selects that exact file and streams its audio through the managed sound instance.
+- OGG playback shares the existing session ownership, pause and resume intent, stop behavior, playback-volume control, and vanilla-music suppression. The current session retains its source independently of later changes to the preferred source.
+- Single-track renaming reads and writes the mapping belonging to the browser's source. Sound-event and OGG names remain independent even when their resource-ID strings are identical. Renaming changes the display-name mapping rather than the resource filename.
+- The rename screen retains its existing custom-name length and same-namespace conflict checks within the selected source. Track-name import continues to inspect both source groups; the sound-event conflict check uses the registered event collection even when import is opened from an OGG browser.
+
+### OGG default names, ambiguity, and ordering
+
+- Generate an OGG default name from the final path component and remove its `.ogg` extension. Resource IDs retain the complete path and extension for resource lookup and storage.
+- Detect duplicate filenames within each namespace using the complete effective OGG catalog. This comparison uses resource filenames independently of custom display names and the current search query, so filtering the visible list does not change which filenames need disambiguation.
+- When a filename occurs more than once in a namespace, display the full path after the namespace separator, including the leading `sounds/` component and `.ogg` extension. For example, `minecraft:sounds/music/home.ogg` and `minecraft:sounds/ui/home.ogg` display as `sounds/music/home.ogg` and `sounds/ui/home.ogg`. A shared directory prefix is retained in both labels.
+- Resource-pack overrides at an identical full resource ID contribute one effective catalog entry. Files in different namespaces do not force each other's short names to expand because the browser already separates namespaces.
+- Sort OGG entries by the filename rather than the expanded path or custom display name. Equal filenames are ordered by the nearest parent directory, then successive parents toward the root. A shorter path precedes a deeper path when all compared suffix components match; the namespace provides the final comparison across otherwise equal paths. Comparisons use the resource strings' natural lexicographic order.
+- Rebuild filename counts when the effective catalog's resource list changes. An open OGG browser reloads its resource entries, namespace options, and visible results after catalog replacement, preserving the selected namespace when it remains available and otherwise selecting the first namespace.
+- **Restore Default Name** removes the selected source's custom mapping and generates the name again from the current catalog. It does not save the generated label as a custom name or check that label against other custom names. A track can therefore change from an expanded path to its short filename after the conflicting resource disappears, or expand again after another matching filename is installed.
+- Restoration bypasses the custom-name length limit as well as custom-name conflict validation, allowing a generated full resource path longer than the editable custom-name limit to be restored. The existing length limit still applies when saving a new custom name.
+
+### Custom-name visual indicators in the single-track browser
+
+- Display a track's row number and name in yellow whenever a custom-name mapping exists, making renamed tracks easy to distinguish from tracks using their generated default names. Default-name rows retain white text.
+- Green search matches take precedence within a yellow custom name. The row number and unmatched portions of that name remain yellow, distinguishing the search match from the custom-name indicator.
+- Restoring the default name removes the mapping and returns the row to its default-name color. The display name is generated from the current resource catalog, so an OGG filename that previously required a full path can return to its short form after the naming conflict disappears.
+
+### Single-track source descriptions and singular wording
+
+- The single-track browser distinguishes registered sound events from directly selected OGG resources. Sound-event rows describe the selected item as a sound event; OGG rows retain the music-file description. This gives each row a description of the resource it actually represents as direct file selection becomes available alongside event-based playback.
+- The namespace remains the argument in both descriptions. The English text reads `sound event from %s` or `music file from %s`; Simplified Chinese uses the corresponding sound-event or music-file description with the same namespace placement.
+- Corrected the English descriptions from plural to singular in all three affected translations. Each description belongs to one track row, so the noun refers to one event or file rather than the browser's collection of results. The correction covers the dedicated playlist-track description as well as the shared music-file and sound-event descriptions.
+- Renamed `view_tracks.description` to `view_tracks.music_file_from`, `common.music_files_from` to `common.music_file_from`, and `common.sound_events_from` to `common.sound_event_from`, under the existing `screen.custommusicclientsideplayer` translation namespace. Both bundled locales and the single-track, playlist-track, playlist-editor, and playlist-play-instance references use the renamed keys. The singular key names keep translation identifiers consistent with the text rendered for an individual item.
+
+### Visible search matches in the single-track browser
+
+- Added green highlighting to matching text in displayed track names so players can immediately see why a result matches the search. Filtering continues to consider both the underlying resource path and the current display name.
+- Filtering and highlighting share a case-insensitive Unicode-aware literal search pattern. Search punctuation is treated as text, so characters such as `.`, `[`, and `*` do not act as regular-expression operators. Highlighting preserves the spelling and letter case of the displayed name.
+- Highlight every occurrence in a displayed name, including overlapping matches. Adjacent or overlapping matched characters form continuous green spans, while surrounding text retains its normal color.
+- Apply highlighting to the visible display name, including the full resource path when an ambiguous OGG filename requires that path to be shown. The row number is outside the searchable name and retains its normal color.
+- Keep a result when only its underlying path matches. If the visible custom name contains no match, retain that name and its normal color without adding the hidden path to the row. This lets players find renamed tracks through their original identifiers while preserving the chosen display names.
+- For an original path such as `the_seas` renamed to `sea`, searching for `sea` highlights the entire visible name in green. Searching for `seas` or `the_` still finds the track through its underlying path, but leaves the visible `sea` in its custom-name color.
+- Empty and whitespace-only searches show the ordinary result list without highlighting. Changing or clearing the query rebuilds the visible results and their matching spans.
+
 ### Verification record
 
 - On October 3, `compileClientJava --offline` passed using Java 25, Minecraft 26.3, Fabric Loader 0.19.5, and Fabric API `0.161.0+26.3`.
 - Generated `fabric.mod.json` contains version `1.5.2-snapshot2`. Source review checked all playlist write callers, the serialization-before-replacement order, and propagation of replacement and temporary-file cleanup failures.
 - On October 3, `compileClientJava --offline` passed after applying mandatory atomic replacement to configuration and custom track names. Source review covered failed Apply retaining the draft and applied baseline, Back/Esc discard warnings, Keep Editing, explicit discard, applying then editing again, reset and imported drafts, and all five configuration fields in the discard formatter and widget synchronization.
 - On October 3, `compileClientJava --offline` passed after declaring the Java runtime dependency. Generated `fabric.mod.json` contains `"java": ">=25"`.
+- In-game testing of the music-manager suppression change confirmed that managed music playback works with the replacement strategy and without the former MUSIC-volume lock.
+- On November 1, Minecraft 26.3 development-client import tests exercised mixed-source warnings, a single warned source with a clean list from the other source, unsupported future versions, repeated version declarations, invalid version values, and scrolling through long warning lists. The error screens retained the generic title while selecting the appropriate version-specific or generic body.
+- Import confirmation saved both source types and retained the valid IDs while skipping unknown-source lists and invalid IDs. A clean OGG list was saved alongside an event list whose invalid tracks were all filtered out. Separate empty event and OGG playlists imported directly, and the preceding four stored lists remained present.
+- The source-group warning layouts were captured at the top, source boundary, and bottom of long content. The short single-source warning used the compact message panel, and its clean source had no empty warning section.
+- Static validation of 48 playlist-transfer fixtures checked the intentionally malformed files, duplicate-key cases, preserved eleven-list nonempty baseline, and the correspondence between OGG sample IDs and existing resource-pack files. UTF-8 validation preserved the original namespace and playlist-name text.
+- Static JSON validation covered eighteen name-import fixtures and five local-name-storage fixtures, including legacy versions, grouped source data, unknown groups, repeated IDs, invalid names, unreadable local groups, and future-version data.
+- The direct-sound implementation was checked against Minecraft 26.3 class signatures for `getOrResolve`, the selected `sound`, and the stored `soundEvent`. Source review also traced source capture through single-track commands, playlist commands, and graphical playback, and checked the source setting's persistence, draft comparison, discard formatter, and widget synchronization.
+- Source review traced single-track source selection through playback confirmation and name editing, checked OGG filename ambiguity and parent-directory ordering, and verified that restoration removes the mapping before regenerating its label. Language JSON validation checked the singular translation keys, their `%s` placeholders, and the absence of obsolete source references.

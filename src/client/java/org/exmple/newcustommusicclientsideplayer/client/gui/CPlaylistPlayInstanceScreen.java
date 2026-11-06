@@ -392,7 +392,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
     }
 
     private static Component buildDescription(Identifier id) {
-        return Component.translatable("screen.custommusicclientsideplayer.common.music_files_from", Component.literal(id.getNamespace()).withStyle(style -> style.withBold(true)));
+        return Component.translatable("screen.custommusicclientsideplayer.common.music_file_from", Component.literal(id.getNamespace()).withStyle(style -> style.withBold(true)));
     }
 
     private static final class TrackPreviewList extends ObjectSelectionList<TrackPreviewList.Entry> {

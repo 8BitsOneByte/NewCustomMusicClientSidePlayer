@@ -144,11 +144,11 @@
   "screen.custommusicclientsideplayer.view_tracks.empty": "(empty playlist)",
   "screen.custommusicclientsideplayer.view_tracks.empty_narration": "Empty playlist",
   "screen.custommusicclientsideplayer.view_tracks.track_order": "%s. %s",
-  "screen.custommusicclientsideplayer.view_tracks.description": "music files from %s",
+  "screen.custommusicclientsideplayer.view_tracks.music_file_from": "music file from %s",
   "screen.custommusicclientsideplayer.common.unknown_namespace_track": "Track from an unknown namespace",
   "screen.custommusicclientsideplayer.common.unplayable_track": "This track is currently unplayable. It may have been removed or renamed.",
 
-  "screen.custommusicclientsideplayer.common.music_files_from": "music files from %s",
+  "screen.custommusicclientsideplayer.common.music_file_from": "music file from %s",
 
   "screen.custommusicclientsideplayer.main_menu.title": "New Custom Music Client Side Player",
   "screen.custommusicclientsideplayer.main_menu.mod_name": "New Custom Music Client Side Player",
@@ -312,5 +312,5 @@
   "command.custommusicclientsideplayer.track_source.already": "Track source already set to %s!",
   "command.custommusicclientsideplayer.track_source.current": "Current track source type: %s",
   "screen.custommusicclientsideplayer.singletrack.track_source": "Track Source:",
-  "screen.custommusicclientsideplayer.common.sound_events_from": "sound events from %s"
+  "screen.custommusicclientsideplayer.common.sound_event_from": "sound event from %s"
 }
