@@ -282,10 +282,11 @@
   "screen.custommusicclientsideplayer.track_name_transfer.import_no_compatible.title": "No Importable Track Names Found",
   "screen.custommusicclientsideplayer.track_name_transfer.import_no_compatible.body": "This file contains no track names that the current version can import. If problems are listed below, fix them and try again.",
   "screen.custommusicclientsideplayer.track_name_transfer.import_warning.title": "Import Track Names Warning",
-  "screen.custommusicclientsideplayer.track_name_transfer.import_warning.body": "Some track-name data in this file requires confirmation. Compatible names can still be imported. Only detected issues are listed below.",
+  "screen.custommusicclientsideplayer.track_name_transfer.import_warning.body": "Some track-name data in this file requires confirmation. Compatible names can still be imported, others will be discarded.",
   "screen.custommusicclientsideplayer.track_name_transfer.import_warning.confirm": "Import Compatible Names",
   "screen.custommusicclientsideplayer.track_name_transfer.import_save_failed.title": "Could Not Save Imported Track Names",
-  "screen.custommusicclientsideplayer.track_name_transfer.import_save_failed.body": "The imported names could not be written to the track-name file. Existing names were not changed. Check Minecraft's file permissions and try again.",
+  "screen.custommusicclientsideplayer.track_name_transfer.import_save_failed.body": "The imported names could not be written to the track-name file. Check Minecraft's file permissions and try again.",
+  "screen.custommusicclientsideplayer.track_name_transfer.warning.unknown_source_groups": "Unknown track source groups; skipped (%s):",
   "screen.custommusicclientsideplayer.track_name_transfer.warning.invalid_track_ids": "Invalid track IDs (%s):",
   "screen.custommusicclientsideplayer.track_name_transfer.warning.duplicate_track_ids": "Duplicate track IDs; all occurrences skipped (%s):",
   "screen.custommusicclientsideplayer.track_name_transfer.warning.non_string_names": "Names that are not text (%s):",
@@ -306,5 +307,10 @@
   "screen.custommusicclientsideplayer.mod_config.track_source.ogg_files": "Ogg Files",
   "screen.custommusicclientsideplayer.mod_config.track_source.tooltip": "%1$s may reference multiple sound files per track, while %2$s reference a single sound file per track.",
   "screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu": "Keep Playing in Game Menu",
-  "screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu.tooltip": "When enabled, disconnecting from a singleplayer world or a server preserves your current music session, allowing the current track to continue playing. Automatic playlist advancement is suspended while you are in the game menus and resumes when you enter a world or join a server."
+  "screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu.tooltip": "When enabled, disconnecting from a singleplayer world or a server preserves your current music session, allowing the current track to continue playing. Automatic playlist advancement is suspended while you are in the game menus and resumes when you enter a world or join a server.",
+  "command.custommusicclientsideplayer.track_source.switched": "Track source switched to %s.",
+  "command.custommusicclientsideplayer.track_source.already": "Track source already set to %s!",
+  "command.custommusicclientsideplayer.track_source.current": "Current track source type: %s",
+  "screen.custommusicclientsideplayer.singletrack.track_source": "Track Source:",
+  "screen.custommusicclientsideplayer.common.sound_events_from": "sound events from %s"
 }

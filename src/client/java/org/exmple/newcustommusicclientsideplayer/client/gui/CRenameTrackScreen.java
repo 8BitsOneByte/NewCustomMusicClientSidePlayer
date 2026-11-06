@@ -1,6 +1,7 @@
 package org.exmple.newcustommusicclientsideplayer.client.gui;
 
 import java.io.IOException;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 import java.util.Objects;
 import java.util.HashSet;
 import java.util.List;
@@ -30,6 +31,7 @@ public final class CRenameTrackScreen extends Screen {
     private static final Component DUPLICATE_NAME_ERROR = Component.translatable("screen.custommusicclientsideplayer.error.track_name_duplicate_same_namespace");
     private static final Component TOO_LONG_NAME_ERROR = Component.translatable("screen.custommusicclientsideplayer.error.track_name_too_long");
 
+    private final CTrackSourceType sourceType;
     private final Screen lastScreen;
     private final Identifier selectedTrack;
     private final Runnable onRenamed;
@@ -42,7 +44,12 @@ public final class CRenameTrackScreen extends Screen {
     private Button renameButton;
 
     public CRenameTrackScreen(Screen lastScreen, Identifier selectedTrack, List<Identifier> sameNamespaceTracks, Runnable onRenamed) {
+        this(lastScreen, selectedTrack, sameNamespaceTracks, onRenamed, CTrackSourceType.SOUND_EVENT);
+    }
+
+    public CRenameTrackScreen(Screen lastScreen, Identifier selectedTrack, List<Identifier> sameNamespaceTracks, Runnable onRenamed, CTrackSourceType sourceType) {
         super(TITLE);
+        this.sourceType = sourceType;
         this.lastScreen = lastScreen;
         this.selectedTrack = selectedTrack;
         this.onRenamed = onRenamed;
@@ -52,7 +59,7 @@ public final class CRenameTrackScreen extends Screen {
                 continue;
             }
 
-            this.existingNamesLower.add(CTrackNameRepository.getDisplayName(trackId).toLowerCase(Locale.ROOT));
+            this.existingNamesLower.add(CTrackNameRepository.getDisplayName(this.sourceType, trackId).toLowerCase(Locale.ROOT));
         }
     }
 
@@ -126,7 +133,7 @@ public final class CRenameTrackScreen extends Screen {
         }
 
         try {
-            CTrackNameRepository.renameTrack(this.selectedTrack, Objects.requireNonNull(this.nameEdit).getValue());
+            CTrackNameRepository.renameTrack(this.sourceType, this.selectedTrack, Objects.requireNonNull(this.nameEdit).getValue());
             this.onRenamed.run();
         } catch (IOException exception) {
             if (this.minecraft.player != null) {

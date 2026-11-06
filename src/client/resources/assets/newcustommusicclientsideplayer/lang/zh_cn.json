@@ -282,10 +282,11 @@
   "screen.custommusicclientsideplayer.track_name_transfer.import_no_compatible.title": "未找到可导入的曲目名称",
   "screen.custommusicclientsideplayer.track_name_transfer.import_no_compatible.body": "此文件中没有当前版本可以导入的曲目名称。若下方列出了问题，请修正后重试。",
   "screen.custommusicclientsideplayer.track_name_transfer.import_warning.title": "导入曲目名称警告",
-  "screen.custommusicclientsideplayer.track_name_transfer.import_warning.body": "此文件中的部分曲目名称数据需要确认。可兼容的名称仍可导入，下方仅列出实际发生的问题。",
+  "screen.custommusicclientsideplayer.track_name_transfer.import_warning.body": "此文件中的部分曲目名称数据需要确认。可兼容的名称仍可导入，其他名称将被丢弃。",
   "screen.custommusicclientsideplayer.track_name_transfer.import_warning.confirm": "导入兼容名称",
   "screen.custommusicclientsideplayer.track_name_transfer.import_save_failed.title": "无法保存导入的曲目名称",
-  "screen.custommusicclientsideplayer.track_name_transfer.import_save_failed.body": "导入内容无法写入曲目名称文件，原有名称未被更改。请检查 Minecraft 的文件访问权限后重试。",
+  "screen.custommusicclientsideplayer.track_name_transfer.import_save_failed.body": "导入内容无法写入曲目名称文件。请检查 Minecraft 的文件访问权限后重试。",
+  "screen.custommusicclientsideplayer.track_name_transfer.warning.unknown_source_groups": "未知的曲目来源分组，已跳过（%s）：",
   "screen.custommusicclientsideplayer.track_name_transfer.warning.invalid_track_ids": "无效的曲目 ID（%s）：",
   "screen.custommusicclientsideplayer.track_name_transfer.warning.duplicate_track_ids": "重复的曲目 ID，已全部跳过（%s）：",
   "screen.custommusicclientsideplayer.track_name_transfer.warning.non_string_names": "名称不是文本（%s）：",
@@ -306,5 +307,10 @@
   "screen.custommusicclientsideplayer.mod_config.track_source.ogg_files": "Ogg文件",
   "screen.custommusicclientsideplayer.mod_config.track_source.tooltip": "%1$s模式的一首曲目可能包含多个声音文件，而%2$s模式的一首曲目只对应一个声音文件。",
   "screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu": "退出世界时保持音乐播放",
-  "screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu.tooltip": "若此项打开，当您从单人世界或服务器断开连接时，现有实例会继续播放。但是，播放列表的自动切歌可能无法正常工作，直到您进入一个单人世界或服务器。"
+  "screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu.tooltip": "若此项打开，当您从单人世界或服务器断开连接时，现有实例会继续播放。但是，播放列表的自动切歌可能无法正常工作，直到您进入一个单人世界或服务器。",
+  "command.custommusicclientsideplayer.track_source.switched": "曲目来源已切换至%s。",
+  "command.custommusicclientsideplayer.track_source.already": "曲目来源已经为%s！",
+  "command.custommusicclientsideplayer.track_source.current": "当前曲目来源：%s",
+  "screen.custommusicclientsideplayer.singletrack.track_source": "曲目来源：",
+  "screen.custommusicclientsideplayer.common.sound_events_from": "来自 %s 的声音事件"
 }

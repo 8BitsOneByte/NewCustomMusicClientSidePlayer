@@ -1,6 +1,10 @@
 package org.exmple.newcustommusicclientsideplayer.client.gui;
 
 import java.io.IOException;
+import net.minecraft.ChatFormatting;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
+import org.exmple.newcustommusicclientsideplayer.client.audio.catalog.CAudioCatalog;
+import org.exmple.newcustommusicclientsideplayer.client.audio.catalog.COggTrackNames;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -96,6 +100,8 @@ public final class CSingleTrackSelectScreen extends Screen {
     private static final Identifier IMPORT_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/import.png");
     private static final Identifier EXPORT_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/export.png");
 
+    private final CTrackSourceType sourceType;
+    private List<Identifier> catalogResources;
     private final Screen parent;
     private final CTrackNameTransferService transferService = new CTrackNameTransferService();
     private final HeaderAndFooterLayout layout =
@@ -119,6 +125,14 @@ public final class CSingleTrackSelectScreen extends Screen {
     public CSingleTrackSelectScreen(Screen parent) {
         super(TITLE);
         this.parent = parent;
+        this.sourceType = NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource();
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (this.sourceType == CTrackSourceType.OGG_RESOURCE
+            && this.catalogResources != CAudioCatalog.getInstance().resources()) this.reloadSounds();
     }
 
     @Override
@@ -255,6 +269,11 @@ public final class CSingleTrackSelectScreen extends Screen {
             mouseCoveredByDropdown ? Integer.MIN_VALUE : mouseY,
             partialTick
         );
+        guiGraphics.text(this.font, Component.translatable("screen.custommusicclientsideplayer.singletrack.track_source"), 8, 8, COLOR_TEXT_WHITE, false);
+        boolean ogg = this.sourceType == CTrackSourceType.OGG_RESOURCE;
+        guiGraphics.text(this.font, Component.translatable("screen.custommusicclientsideplayer.mod_config.track_source."
+            + (ogg ? "ogg_files" : "sound_events")).withStyle(ogg ? ChatFormatting.GOLD : ChatFormatting.GREEN),
+            8, 8 + this.font.lineHeight + 2, COLOR_TEXT_WHITE, false);
         this.extractTransferButtonIcon(guiGraphics, this.importButton, IMPORT_ICON);
         this.extractTransferButtonIcon(guiGraphics, this.exportButton, EXPORT_ICON);
         this.dropdownCoordinator.extractOverlays(
@@ -340,9 +359,12 @@ public final class CSingleTrackSelectScreen extends Screen {
             return;
         }
 
-        Collection<Identifier> available = this.minecraft.getSoundManager().getAvailableSounds();
+        this.catalogResources = CAudioCatalog.getInstance().resources();
+        Collection<Identifier> available = this.sourceType == CTrackSourceType.OGG_RESOURCE
+            ? this.catalogResources : this.minecraft.getSoundManager().getAvailableSounds();
         this.allSounds.clear();
-        this.allSounds.addAll(available.stream().sorted(Comparator.comparing(Identifier::toString)).toList());
+        this.allSounds.addAll(available.stream().sorted(this.sourceType == CTrackSourceType.OGG_RESOURCE
+            ? COggTrackNames::compare : Comparator.comparing(Identifier::toString)).toList());
         String previousNamespace = this.getCurrentNamespace();
         List<String> availableNamespaces = this.allSounds.stream()
             .map(Identifier::getNamespace)
@@ -382,7 +404,7 @@ public final class CSingleTrackSelectScreen extends Screen {
             .filter(id -> id.getNamespace().equals(namespace))
             .filter(id -> currentFilter.isBlank()
                 || id.getPath().toLowerCase(Locale.ROOT).contains(currentFilter)
-                || CTrackNameRepository.getDisplayName(id).toLowerCase(Locale.ROOT).contains(currentFilter))
+                || CTrackNameRepository.getDisplayName(this.sourceType, id).toLowerCase(Locale.ROOT).contains(currentFilter))
             .toList();
         this.soundSelectionList.setEntries(visible);
         this.updateButtonStates();
@@ -391,7 +413,7 @@ public final class CSingleTrackSelectScreen extends Screen {
     private void updateButtonStates() {
         Identifier selectedTrack = this.getSelectedSound();
         boolean hasSelection = selectedTrack != null;
-        boolean hasCustomName = hasSelection && CTrackNameRepository.getCustomName(selectedTrack) != null;
+        boolean hasCustomName = hasSelection && CTrackNameRepository.getCustomName(this.sourceType, selectedTrack) != null;
         boolean fullscreen = this.minecraft != null && this.minecraft.options.fullscreen().get();
         Tooltip fullscreenTooltip = fullscreen ? Tooltip.create(MUST_DISABLE_FULLSCREEN) : null;
         if (this.importButton != null) {
@@ -470,7 +492,7 @@ public final class CSingleTrackSelectScreen extends Screen {
     private void handleImportPath(Path path) {
         CTrackNameImportPreview preview;
         try {
-            preview = this.transferService.previewImport(path, this.allSounds);
+            preview = this.transferService.previewImport(path, this.minecraft.getSoundManager().getAvailableSounds());
         } catch (CTrackNameImportException exception) {
             this.openImportExceptionScreen(exception);
             return;
@@ -564,7 +586,13 @@ public final class CSingleTrackSelectScreen extends Screen {
             () -> this.minecraft.gui.setScreen(this),
             null,
             null
-        ));
+        ) {
+            @Override
+            protected Component formatListItem(Component item) {
+                return item.getString().isEmpty() || CPlaylistImportWarningFormatter.isSourceHeading(item)
+                    ? item : super.formatListItem(item);
+            }
+        });
     }
 
     private void openImportWarningScreen(CTrackNameImportPreview preview) {
@@ -585,7 +613,13 @@ public final class CSingleTrackSelectScreen extends Screen {
                     this.minecraft.gui.setScreen(this);
                 }
             }
-        ));
+        ) {
+            @Override
+            protected Component formatListItem(Component item) {
+                return item.getString().isEmpty() || CPlaylistImportWarningFormatter.isSourceHeading(item)
+                    ? item : super.formatListItem(item);
+            }
+        });
     }
 
     private void showImportSuccess(int importedCount) {
@@ -672,7 +706,7 @@ public final class CSingleTrackSelectScreen extends Screen {
         this.minecraft.gui.setScreen(
             new CSingleTrackPlayConfirmScreen(this, selected, (loop, pitch) -> {
                 this.minecraft.gui.setScreen(null);
-                CPlaySoundController.playFromUi(this.minecraft, selected, loop, pitch);
+                CPlaySoundController.playFromUi(this.minecraft, selected, loop, pitch, this.sourceType);
             })
         );
     }
@@ -686,19 +720,20 @@ public final class CSingleTrackSelectScreen extends Screen {
         List<Identifier> sameNamespaceTracks = this.allSounds.stream()
             .filter(id -> id.getNamespace().equals(selected.getNamespace()))
             .toList();
-        this.minecraft.gui.setScreen(new CRenameTrackScreen(this, selected, sameNamespaceTracks, this::refreshVisibleEntries));
+        this.minecraft.gui.setScreen(new CRenameTrackScreen(this, selected, sameNamespaceTracks, this::refreshVisibleEntries, this.sourceType));
     }
 
     private void onRestoreSelectedTrackName() {
         Identifier selected = this.getSelectedSound();
-        if (selected == null || CTrackNameRepository.getCustomName(selected) == null) {
+        if (selected == null || CTrackNameRepository.getCustomName(this.sourceType, selected) == null) {
             return;
         }
 
         try {
             CTrackNameRepository.renameTrack(
+                this.sourceType,
                 selected,
-                CTrackNameRepository.getDefaultDisplayName(selected)
+                ""
             );
             this.refreshVisibleEntries();
         } catch (IOException | RuntimeException exception) {
@@ -712,8 +747,8 @@ public final class CSingleTrackSelectScreen extends Screen {
         this.minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
     }
 
-    static String getDisplayName(Identifier id) {
-        return CTrackNameRepository.getDisplayName(id);
+    private String getDisplayName(Identifier id) {
+        return CTrackNameRepository.getDisplayName(this.sourceType, id);
     }
 
     private final class SoundSelectionList extends ObjectSelectionList<SoundSelectionList.Entry> {
@@ -797,7 +832,9 @@ public final class CSingleTrackSelectScreen extends Screen {
                 guiGraphics.blit(RenderPipelines.GUI_TEXTURED, icon, this.getContentX(), this.getContentY(), 0.0F, 0.0F, 32, 32, 32, 32);
 
                 int textX = this.getContentX() + 34;
-                guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, CSingleTrackSelectScreen.getDisplayName(this.id)), textX, this.getContentY() + 1, COLOR_TEXT_WHITE, false);
+                guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, CSingleTrackSelectScreen.this.getDisplayName(this.id)), textX, this.getContentY() + 1,
+                    CTrackNameRepository.getCustomName(CSingleTrackSelectScreen.this.sourceType, this.id) == null
+                        ? COLOR_TEXT_WHITE : 0xFFFFFF55, false);
                 guiGraphics.text(font, buildDescription(this.id), textX, this.getContentY() + 12, COLOR_TEXT_GRAY, false);
 
                 boolean showHoverOverlay = !this.list.minecraft.getLastInputType().isMouse() || hovered || this.list.getSelected() == this && this.list.isFocused();
@@ -822,7 +859,9 @@ public final class CSingleTrackSelectScreen extends Screen {
 
             private Component buildDescription(Identifier id) {
                 return Component.translatable(
-                    "screen.custommusicclientsideplayer.common.music_files_from",
+                    CSingleTrackSelectScreen.this.sourceType == CTrackSourceType.OGG_RESOURCE
+                        ? "screen.custommusicclientsideplayer.common.music_files_from"
+                        : "screen.custommusicclientsideplayer.common.sound_events_from",
                     Component.literal(id.getNamespace()).withStyle(style -> style.withBold(true))
                 );
             }

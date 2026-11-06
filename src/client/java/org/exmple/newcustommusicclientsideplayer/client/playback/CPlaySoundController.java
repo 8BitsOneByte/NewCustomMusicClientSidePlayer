@@ -1,6 +1,7 @@
 package org.exmple.newcustommusicclientsideplayer.client.playback;
 
 import java.util.List;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -71,6 +72,7 @@ public final class CPlaySoundController {
     private static SessionMode lastSessionMode = SessionMode.NONE;
     private static int playbackVolumePercent = CModConfig.DEFAULT_PLAYBACK_VOLUME_PERCENT;
     private static boolean customPaused;
+    private static CTrackSourceType sessionSource = CTrackSourceType.SOUND_EVENT;
 
     private CPlaySoundController() {
     }
@@ -261,6 +263,7 @@ public final class CPlaySoundController {
 
         clearPlaylistSession();
         forceStopTrackedSound(client);
+        sessionSource = NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource();
         if (!startSound(client, soundId, loop, pitch)) {
             source.sendError(Component.translatable("message.custommusicclientsideplayer.unknown_sound_id", soundId.toString()));
             return 0;
@@ -276,6 +279,10 @@ public final class CPlaySoundController {
     }
 
     public static int playFromUi(Minecraft client, Identifier soundId, boolean loop, float pitch) {
+        return playFromUi(client, soundId, loop, pitch, CTrackSourceType.SOUND_EVENT);
+    }
+
+    public static int playFromUi(Minecraft client, Identifier soundId, boolean loop, float pitch, CTrackSourceType type) {
         if (client.level == null) {
             if (client.player != null) {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.no_client_world"));
@@ -286,6 +293,7 @@ public final class CPlaySoundController {
 
         clearPlaylistSession();
         forceStopTrackedSound(client);
+        sessionSource = type;
         if (!startSound(client, soundId, loop, pitch)) {
             if (client.player != null) {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.unknown_sound_id", soundId.toString()));
@@ -309,6 +317,10 @@ public final class CPlaySoundController {
     }
 
     public static int playPlaylist(FabricClientCommandSource source, String name, List<Identifier> playlist, boolean loop, boolean shuffle, int startTrackIndex) {
+        return playPlaylist(source, name, playlist, loop, shuffle, startTrackIndex, CTrackSourceType.SOUND_EVENT);
+    }
+
+    public static int playPlaylist(FabricClientCommandSource source, String name, List<Identifier> playlist, boolean loop, boolean shuffle, int startTrackIndex, CTrackSourceType type) {
         Minecraft client = source.getClient();
         if (client.level == null) {
             source.sendError(Component.translatable("message.custommusicclientsideplayer.no_client_world"));
@@ -320,13 +332,13 @@ public final class CPlaySoundController {
             return 0;
         }
 
-        List<Identifier> playablePlaylist = filterPlayableSounds(client, playlist);
+        List<Identifier> playablePlaylist = filterPlayableSounds(client, playlist, type);
         if (playablePlaylist.isEmpty()) {
             source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound").withStyle(ChatFormatting.RED));
             return 0;
         }
 
-        List<Integer> displayIndices = buildPlayableDisplayIndices(client, playlist);
+        List<Integer> displayIndices = buildPlayableDisplayIndices(client, playlist, type);
         int startQueueIndex = findStartQueueIndex(displayIndices, startTrackIndex, loop);
         if (startQueueIndex < 0) {
             source.sendError(Component.translatable("message.custommusicclientsideplayer.no_playable_sound").withStyle(ChatFormatting.RED));
@@ -335,6 +347,7 @@ public final class CPlaySoundController {
 
         forceStopTrackedSound(client);
 
+        sessionSource = type;
         playlistQueue = playablePlaylist;
         playlistDisplayIndices = displayIndices;
         playlistNextIndex = startQueueIndex;
@@ -384,7 +397,7 @@ public final class CPlaySoundController {
             return 0;
         }
 
-        List<Identifier> playablePlaylist = filterPlayableSounds(client, playlist);
+        List<Identifier> playablePlaylist = filterPlayableSounds(client, playlist, CTrackSourceType.SOUND_EVENT);
         if (playablePlaylist.isEmpty()) {
             if (client.player != null) {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.no_playable_sound"));
@@ -393,7 +406,7 @@ public final class CPlaySoundController {
             return 0;
         }
 
-        List<Integer> displayIndices = buildPlayableDisplayIndices(client, playlist);
+        List<Integer> displayIndices = buildPlayableDisplayIndices(client, playlist, CTrackSourceType.SOUND_EVENT);
         int startQueueIndex = findStartQueueIndex(displayIndices, startTrackIndex, loop);
         if (startQueueIndex < 0) {
             if (client.player != null) {
@@ -405,6 +418,7 @@ public final class CPlaySoundController {
 
         forceStopTrackedSound(client);
 
+        sessionSource = CTrackSourceType.SOUND_EVENT;
         playlistQueue = playablePlaylist;
         playlistDisplayIndices = displayIndices;
         playlistNextIndex = startQueueIndex;
@@ -717,12 +731,12 @@ public final class CPlaySoundController {
     }
 
     private static String getDisplayName(Identifier id) {
-        return CTrackNameRepository.getDisplayName(id);
+        return CTrackNameRepository.getDisplayName(sessionSource, id);
     }
 
     private static boolean startSound(Minecraft client, Identifier soundId, boolean loop, float pitch) {
         SoundManager soundManager = client.getSoundManager();
-        if (!isTrackPlayable(client, soundId)) {
+        if (!isTrackPlayable(client, soundId, sessionSource)) {
             return false;
         }
 
@@ -743,6 +757,7 @@ public final class CPlaySoundController {
             0.0,
             true
         );
+        managedSound.setTrackSource(sessionSource);
         OWNED_SOUNDS.activate(managedSound);
         // Publish the session before stopping vanilla music or submitting asynchronous audio loading.
         ((CVanillaMusicControl) client.getMusicManager())
@@ -800,14 +815,14 @@ public final class CPlaySoundController {
         return true;
     }
 
-    private static List<Identifier> filterPlayableSounds(Minecraft client, List<Identifier> sounds) {
-        return sounds.stream().filter(id -> isTrackPlayable(client, id)).toList();
+    private static List<Identifier> filterPlayableSounds(Minecraft client, List<Identifier> sounds, CTrackSourceType type) {
+        return sounds.stream().filter(id -> isTrackPlayable(client, id, type)).toList();
     }
 
-    private static List<Integer> buildPlayableDisplayIndices(Minecraft client, List<Identifier> sounds) {
+    private static List<Integer> buildPlayableDisplayIndices(Minecraft client, List<Identifier> sounds, CTrackSourceType type) {
         java.util.ArrayList<Integer> indices = new java.util.ArrayList<>();
         for (int i = 0; i < sounds.size(); i++) {
-            if (isTrackPlayable(client, sounds.get(i))) {
+            if (isTrackPlayable(client, sounds.get(i), type)) {
                 indices.add(i + 1);
             }
         }
@@ -831,7 +846,13 @@ public final class CPlaySoundController {
             return false;
         }
 
-        return client.getSoundManager().getSoundEvent(soundId) != null;
+        return isTrackPlayable(client, soundId, CTrackSourceType.SOUND_EVENT);
+    }
+
+    public static boolean isTrackPlayable(Minecraft client, Identifier id, CTrackSourceType type) {
+        if (client == null || !type.accepts(id)) return false;
+        return type == CTrackSourceType.SOUND_EVENT ? client.getSoundManager().getSoundEvent(id) != null
+            : client.getResourceManager().getResource(id).isPresent();
     }
 
     private static void forceStopTrackedSound(Minecraft client) {

@@ -92,6 +92,7 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
         CSkipCommand.register();
         CSkipRandomCommand.register();
         CPlaylistCommand.register();
+        org.exmple.newcustommusicclientsideplayer.client.command.CTrackSourceCommand.register();
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             CPlaySoundController.tick(client);

@@ -52,7 +52,7 @@ public final class CTrackNameTransferService {
             modVersion(),
             minecraftVersion(),
             System.currentTimeMillis(),
-            CTrackNameRepository.exportCustomNames()
+            CTrackNameRepository.exportGroupedNames()
         );
         try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
             GSON.toJson(data, writer);
@@ -71,19 +71,34 @@ public final class CTrackNameTransferService {
             throw CTrackNameImportException.invalidTrackNameFile();
         }
 
-        Map<String, String> currentNames;
+        Map<CTrackSourceType, CTrackNameImportPreview> groups = new LinkedHashMap<>();
+        List<String> unknown = new ArrayList<>();
         try {
-            currentNames = CTrackNameRepository.exportCustomNames();
-        } catch (IOException exception) {
-            throw CTrackNameImportException.ioError(exception);
-        }
-
-        return scanTrackNames(transferFile.entries(), availableTracks, currentNames);
+            if (transferFile.version() == 1) {
+                groups.put(CTrackSourceType.SOUND_EVENT, scanTrackNames(transferFile.entries(), availableTracks,
+                    CTrackNameRepository.exportCustomNames(CTrackSourceType.SOUND_EVENT), CTrackSourceType.SOUND_EVENT));
+            } else {
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                for (RawTrackNameEntry entry : transferFile.entries()) {
+                    if (!seen.add(entry.rawTrackId())) throw CTrackNameImportException.invalidTrackNameFile();
+                    CTrackSourceType type;
+                    try { type = CTrackSourceType.valueOf(entry.rawTrackId()); }
+                    catch (IllegalArgumentException exception) { unknown.add(entry.rawTrackId()); continue; }
+                    if (entry.nested() == null) throw CTrackNameImportException.invalidTrackNameFile();
+                    Collection<Identifier> tracks = type == CTrackSourceType.SOUND_EVENT ? availableTracks
+                        : org.exmple.newcustommusicclientsideplayer.client.audio.catalog.CAudioCatalog.getInstance().resources();
+                    groups.put(type, scanTrackNames(entry.nested(), tracks, CTrackNameRepository.exportCustomNames(type), type));
+                }
+            }
+        } catch (IOException exception) { throw CTrackNameImportException.ioError(exception); }
+        return CTrackNameImportPreview.grouped(groups, unknown);
     }
 
     public CTrackNameRepository.ImportResult importPreview(CTrackNameImportPreview preview) throws IOException {
-        Objects.requireNonNull(preview, "preview");
-        return CTrackNameRepository.importCustomNames(preview.compatibleNames());
+        Map<CTrackSourceType, Map<Identifier, String>> groups = new LinkedHashMap<>();
+        if (preview.groups().isEmpty()) groups.put(CTrackSourceType.SOUND_EVENT, preview.compatibleNames());
+        else preview.groups().forEach((type, group) -> groups.put(type, group.compatibleNames()));
+        return CTrackNameRepository.importGroupedNames(groups);
     }
 
     private static ParsedTransferFile readTransferFile(Path path) throws CTrackNameImportException {
@@ -105,6 +120,8 @@ public final class CTrackNameTransferService {
                 throw CTrackNameImportException.invalidTrackNameFile();
             }
 
+            JsonElement version = null;
+            boolean sawVersion = false;
             String modId = null;
             boolean sawModId = false;
             boolean modIdReadable = false;
@@ -114,7 +131,11 @@ public final class CTrackNameTransferService {
             jsonReader.beginObject();
             while (jsonReader.hasNext()) {
                 String name = jsonReader.nextName();
-                if (MOD_ID_KEY.equals(name)) {
+                if ("formatVersion".equals(name)) {
+                    if (sawVersion) throw CTrackNameImportException.invalidTrackNameFile();
+                    sawVersion = true;
+                    version = JsonParser.parseReader(jsonReader);
+                } else if (MOD_ID_KEY.equals(name)) {
                     if (sawModId) {
                         throw CTrackNameImportException.invalidTrackNameFile();
                     }
@@ -148,7 +169,9 @@ public final class CTrackNameTransferService {
                 throw CTrackNameImportException.invalidTrackNameFile();
             }
 
-            return new ParsedTransferFile(modId, entries);
+            return new ParsedTransferFile(modId, entries, CPlaylistFormat.version(version));
+        } catch (CPlaylistStorageException exception) {
+            throw CTrackNameImportException.invalidTrackNameFile(exception);
         } catch (CTrackNameImportException exception) {
             throw exception;
         } catch (JsonParseException | IllegalStateException | MalformedJsonException exception) {
@@ -163,8 +186,11 @@ public final class CTrackNameTransferService {
         jsonReader.beginObject();
         while (jsonReader.hasNext()) {
             String rawTrackId = jsonReader.nextName();
-            JsonElement value = JsonParser.parseReader(jsonReader);
-            entries.add(new RawTrackNameEntry(rawTrackId, value));
+            if (jsonReader.peek() == JsonToken.BEGIN_OBJECT) {
+                entries.add(new RawTrackNameEntry(rawTrackId, null, readTrackNameEntries(jsonReader)));
+            } else {
+                entries.add(new RawTrackNameEntry(rawTrackId, JsonParser.parseReader(jsonReader), null));
+            }
         }
         jsonReader.endObject();
         return entries;
@@ -173,7 +199,7 @@ public final class CTrackNameTransferService {
     private static CTrackNameImportPreview scanTrackNames(
         List<RawTrackNameEntry> entries,
         Collection<Identifier> availableTracks,
-        Map<String, String> currentNames
+        Map<String, String> currentNames, CTrackSourceType sourceType
     ) {
         List<String> invalidTrackIds = new ArrayList<>();
         LinkedHashSet<Identifier> duplicateTrackIds = new LinkedHashSet<>();
@@ -188,7 +214,8 @@ public final class CTrackNameTransferService {
         Map<Identifier, Integer> occurrenceCounts = new HashMap<>();
         for (RawTrackNameEntry entry : entries) {
             Identifier trackId = Identifier.tryParse(entry.rawTrackId());
-            if (trackId == null || trackId.getPath().isEmpty()) {
+            if (!sourceType.accepts(trackId)) {
+                trackId = null;
                 invalidTrackIds.add(entry.rawTrackId());
             } else {
                 occurrenceCounts.merge(trackId, 1, Integer::sum);
@@ -223,7 +250,7 @@ public final class CTrackNameTransferService {
                 tooLongNames.add(new CTrackNameImportPreview.TrackName(trackId, name));
                 continue;
             }
-            if (name.equals(CTrackNameRepository.getDefaultDisplayName(trackId))) {
+            if (name.equals(CTrackNameRepository.getDefaultDisplayName(sourceType, trackId))) {
                 defaultNames.add(new CTrackNameImportPreview.TrackName(trackId, name));
                 continue;
             }
@@ -246,7 +273,7 @@ public final class CTrackNameTransferService {
         int candidateIndex = 0;
         for (Map.Entry<Identifier, String> candidate : candidates.entrySet()) {
             candidateOrder.put(candidate.getKey(), candidateIndex++);
-            if (candidate.getValue().equals(currentDisplayName(candidate.getKey(), currentNames))) {
+            if (candidate.getValue().equals(currentDisplayName(candidate.getKey(), currentNames, sourceType))) {
                 unchangedCandidates.add(candidate.getKey());
             } else {
                 activeCandidates.put(candidate.getKey(), candidate.getValue());
@@ -257,7 +284,7 @@ public final class CTrackNameTransferService {
             knownTracks,
             activeCandidates,
             candidateOrder,
-            currentNames
+            currentNames, sourceType
         );
         LinkedHashMap<Identifier, String> compatibleNames = new LinkedHashMap<>();
         for (Map.Entry<Identifier, String> candidate : candidates.entrySet()) {
@@ -303,7 +330,7 @@ public final class CTrackNameTransferService {
         Collection<Identifier> knownTracks,
         LinkedHashMap<Identifier, String> activeCandidates,
         Map<Identifier, Integer> candidateOrder,
-        Map<String, String> currentNames
+        Map<String, String> currentNames, CTrackSourceType sourceType
     ) {
         LinkedHashMap<Identifier, OccupiedName> conflicts = new LinkedHashMap<>();
         while (true) {
@@ -311,7 +338,7 @@ public final class CTrackNameTransferService {
             for (Identifier trackId : knownTracks) {
                 String displayName = activeCandidates.getOrDefault(
                     trackId,
-                    currentDisplayName(trackId, currentNames)
+                    currentDisplayName(trackId, currentNames, sourceType)
                 );
                 finalNames.computeIfAbsent(
                     new NameKey(trackId.getNamespace(), displayName.toLowerCase(Locale.ROOT)),
@@ -366,9 +393,9 @@ public final class CTrackNameTransferService {
         }
     }
 
-    private static String currentDisplayName(Identifier trackId, Map<String, String> currentNames) {
+    private static String currentDisplayName(Identifier trackId, Map<String, String> currentNames, CTrackSourceType sourceType) {
         String customName = currentNames.get(trackId.toString());
-        return customName == null ? CTrackNameRepository.getDefaultDisplayName(trackId) : customName;
+        return customName == null ? CTrackNameRepository.getDefaultDisplayName(sourceType, trackId) : customName;
     }
 
     private static String modName() {
@@ -403,10 +430,10 @@ public final class CTrackNameTransferService {
         return sanitized.toLowerCase(Locale.ROOT).equals(UNKNOWN_VERSION) ? UNKNOWN_VERSION : sanitized;
     }
 
-    private record ParsedTransferFile(String modId, List<RawTrackNameEntry> entries) {
+    private record ParsedTransferFile(String modId, List<RawTrackNameEntry> entries, int version) {
     }
 
-    private record RawTrackNameEntry(String rawTrackId, JsonElement value) {
+    private record RawTrackNameEntry(String rawTrackId, JsonElement value, List<RawTrackNameEntry> nested) {
     }
 
     private record ParsedRawEntry(Identifier trackId, JsonElement value) {

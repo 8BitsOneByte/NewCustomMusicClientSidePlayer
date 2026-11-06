@@ -6,14 +6,14 @@ import java.util.Objects;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
 
 public final class CTrackNameTransferData {
-    public static final int CURRENT_FORMAT_VERSION = 1;
+    public static final int CURRENT_FORMAT_VERSION = 2;
 
     private int formatVersion = CURRENT_FORMAT_VERSION;
     private String modId = NewcustommusicclientsideplayerClient.MOD_ID;
     private String modVersion = "";
     private String minecraftVersion = "";
     private long exportedAt;
-    private LinkedHashMap<String, String> trackNames = new LinkedHashMap<>();
+    private com.google.gson.JsonObject trackNames = new com.google.gson.JsonObject();
 
     CTrackNameTransferData() {
     }
@@ -22,11 +22,11 @@ public final class CTrackNameTransferData {
         String modVersion,
         String minecraftVersion,
         long exportedAt,
-        Map<String, String> trackNames
+        com.google.gson.JsonObject trackNames
     ) {
         this.modVersion = Objects.requireNonNull(modVersion, "modVersion");
         this.minecraftVersion = Objects.requireNonNull(minecraftVersion, "minecraftVersion");
         this.exportedAt = exportedAt;
-        this.trackNames = new LinkedHashMap<>(Objects.requireNonNull(trackNames, "trackNames"));
+        this.trackNames = Objects.requireNonNull(trackNames, "trackNames").deepCopy();
     }
 }

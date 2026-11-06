@@ -17,6 +17,25 @@ public final class CTrackNameImportWarningFormatter {
 
     public static List<Component> format(CTrackNameImportPreview preview) {
         List<Component> items = new ArrayList<>();
+        if (!preview.unknownGroups().isEmpty()) {
+            items.add(heading("unknown_source_groups", preview.unknownGroups().size()));
+            for (String name : preview.unknownGroups()) items.add(Component.literal(name).withStyle(ChatFormatting.RED));
+        }
+        if (!preview.groups().isEmpty()) {
+            for (var type : List.of(org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType.OGG_RESOURCE,
+                    org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType.SOUND_EVENT)) {
+                var group = preview.groups().get(type);
+                if (group == null || !group.hasWarnings()) continue;
+                if (!items.isEmpty()) items.add(Component.empty());
+                boolean ogg = type == org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType.OGG_RESOURCE;
+                Component label = Component.translatable("screen.custommusicclientsideplayer.mod_config.track_source."
+                    + (ogg ? "ogg_files" : "sound_events")).withStyle(ogg ? ChatFormatting.GOLD : ChatFormatting.GREEN);
+                items.add(Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.warning.source_type", label)
+                    .withStyle(ChatFormatting.GRAY));
+                items.addAll(format(group));
+            }
+            return items;
+        }
         addInvalidTrackIds(items, preview);
         addDuplicateTrackIds(items, preview);
         addNonStringNames(items, preview);
