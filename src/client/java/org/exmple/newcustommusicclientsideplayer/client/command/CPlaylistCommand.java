@@ -22,6 +22,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistRepository;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistData;
+import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
 import org.exmple.newcustommusicclientsideplayer.client.gui.CPlaylistTestScreen;
 
@@ -235,7 +237,7 @@ public final class CPlaylistCommand {
             }
 
             var data = CPlaylistRepository.getPlaylist(normalizedName).orElseThrow(() -> new IOException("Missing playlist"));
-            if (data.sourceType() != org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource())
+            if (data.sourceType() != NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource())
                 throw new IOException("Source mismatch");
             playlist = data.tracks();
         } catch (IOException exception) {
@@ -256,13 +258,13 @@ public final class CPlaylistCommand {
             return 0;
         }
 
-        return CPlaySoundController.playPlaylist(source, normalizedName, playlist, loop, shuffle, startIndex - 1, org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource());
+        return CPlaySoundController.playPlaylist(source, normalizedName, playlist, loop, shuffle, startIndex - 1, NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource());
     }
 
     private static int findRandomPlayableStartIndex(Minecraft client, List<Identifier> playlist) {
         java.util.ArrayList<Integer> playableIndices = new java.util.ArrayList<>();
         for (int i = 0; i < playlist.size(); i++) {
-            if (CPlaySoundController.isTrackPlayable(client, playlist.get(i), org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource())) {
+            if (CPlaySoundController.isTrackPlayable(client, playlist.get(i), NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource())) {
                 playableIndices.add(i + 1);
             }
         }
@@ -281,6 +283,7 @@ public final class CPlaylistCommand {
             return 0;
         }
 
+        var type = NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource();
         List<Identifier> initialPlaylist;
         try {
             if (!CPlaylistRepository.exists(normalizedName)) {
@@ -288,7 +291,7 @@ public final class CPlaylistCommand {
                 return 0;
             }
 
-            initialPlaylist = CPlaylistRepository.getSoundEventPlaylist(normalizedName);
+            initialPlaylist = CPlaylistRepository.getPlaylist(normalizedName, type).orElseThrow(() -> new IOException("Missing playlist")).tracks();
         } catch (IOException exception) {
             source.sendError(Component.translatable("screen.custommusicclientsideplayer.error.open_playlist_failed"));
             return 0;
@@ -301,7 +304,8 @@ public final class CPlaylistCommand {
                                 client.gui.screen(),
                                 normalizedName,
                                 initialPlaylist,
-                                updatedPlaylist -> CPlaylistRepository.savePlaylist(normalizedName, updatedPlaylist)
+                                updatedPlaylist -> CPlaylistRepository.savePlaylist(normalizedName, new CPlaylistData(type, updatedPlaylist, System.currentTimeMillis())),
+                                () -> {}, type
                         )
                 )
         );
@@ -319,13 +323,7 @@ public final class CPlaylistCommand {
         String normalizedPrefix = normalizeSuggestionPrefix(remaining).toLowerCase(Locale.ROOT);
 
         try {
-            boolean playing = context.getNodes().stream().anyMatch(node -> node.getNode().getName().equals("play"));
             for (String name : CPlaylistRepository.listPlaylistNames()) {
-                if (playing) {
-                    var playlist = CPlaylistRepository.getPlaylist(name);
-                    if (playlist.isEmpty() || playlist.get().sourceType() !=
-                        org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource()) continue;
-                }
                 String suggestion = toSuggestedPlaylistToken(name);
                 String suggestionLower = suggestion.toLowerCase(Locale.ROOT);
                 String rawLower = name.toLowerCase(Locale.ROOT);

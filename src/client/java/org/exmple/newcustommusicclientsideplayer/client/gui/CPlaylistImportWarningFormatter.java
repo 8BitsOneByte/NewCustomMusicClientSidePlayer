@@ -3,8 +3,6 @@ package org.exmple.newcustommusicclientsideplayer.client.gui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.ChatFormatting;
@@ -50,16 +48,8 @@ public final class CPlaylistImportWarningFormatter {
     }
 
     private static void addSource(List<Component> items, CPlaylistImportPreview preview, CTrackSourceType type) {
-        var playlists = preview.playlists().stream().filter(item -> item.sourceType() == type).toList();
-        Set<String> names = playlists.stream().map(CPlaylistImportPreview.PlaylistToImport::name).collect(Collectors.toSet());
-        java.util.LinkedHashMap<String, List<String>> invalidTracks = new java.util.LinkedHashMap<>();
-        preview.invalidTracksByPlaylist().forEach((name, tracks) -> {
-            if (names.contains(name)) invalidTracks.put(name, tracks);
-        });
-        CPlaylistImportPreview group = new CPlaylistImportPreview(playlists, List.of(),
-            preview.unreadableTrackListPlaylists().stream().filter(names::contains).toList(), invalidTracks,
-            preview.invalidModifiedAtPlaylists().stream().filter(names::contains).toList(),
-            preview.renamedPlaylists().stream().filter(item -> names.contains(item.importedName())).toList());
+        CPlaylistImportPreview group = preview.sourceGroup(type);
+        if (group == null) return;
         if (!group.hasWarnings()) return;
         if (!items.isEmpty()) items.add(Component.empty());
         boolean ogg = type == CTrackSourceType.OGG_RESOURCE;

@@ -6,7 +6,7 @@ import com.google.gson.JsonPrimitive;
 import java.math.BigInteger;
 
 final class CPlaylistFormat {
-    static final int CURRENT_VERSION = 2;
+    static final int CURRENT_VERSION = 3;
 
     private CPlaylistFormat() {
     }

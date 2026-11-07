@@ -7,6 +7,7 @@ import java.util.Objects;
 import net.minecraft.resources.Identifier;
 
 public final class CPlaylistImportPreview {
+    private final Map<CTrackSourceType, CPlaylistImportPreview> sourceGroups;
     private final List<PlaylistToImport> playlists;
     private final List<String> skippedPlaylistEntries;
     private final List<String> unreadableTrackListPlaylists;
@@ -22,6 +23,15 @@ public final class CPlaylistImportPreview {
         List<String> invalidModifiedAtPlaylists,
         List<Rename> renamedPlaylists
     ) {
+        this(playlists, skippedPlaylistEntries, unreadableTrackListPlaylists, invalidTracksByPlaylist,
+            invalidModifiedAtPlaylists, renamedPlaylists, Map.of());
+    }
+
+    public CPlaylistImportPreview(List<PlaylistToImport> playlists, List<String> skippedPlaylistEntries,
+        List<String> unreadableTrackListPlaylists, Map<String, List<String>> invalidTracksByPlaylist,
+        List<String> invalidModifiedAtPlaylists, List<Rename> renamedPlaylists,
+        Map<CTrackSourceType, CPlaylistImportPreview> sourceGroups) {
+        this.sourceGroups = Map.copyOf(sourceGroups);
         this.playlists = copyList(playlists, "playlists");
         this.skippedPlaylistEntries = copyList(skippedPlaylistEntries, "skippedPlaylistEntries");
         this.unreadableTrackListPlaylists = copyList(
@@ -61,8 +71,13 @@ public final class CPlaylistImportPreview {
         return List.copyOf(this.renamedPlaylists);
     }
 
+    public CPlaylistImportPreview sourceGroup(CTrackSourceType type) {
+        return this.sourceGroups.get(type);
+    }
+
     public boolean hasWarnings() {
-        return !this.skippedPlaylistEntries.isEmpty()
+        return this.sourceGroups.values().stream().anyMatch(CPlaylistImportPreview::hasWarnings)
+            || !this.skippedPlaylistEntries.isEmpty()
             || !this.unreadableTrackListPlaylists.isEmpty()
             || !this.invalidTracksByPlaylist.isEmpty()
             || !this.invalidModifiedAtPlaylists.isEmpty()

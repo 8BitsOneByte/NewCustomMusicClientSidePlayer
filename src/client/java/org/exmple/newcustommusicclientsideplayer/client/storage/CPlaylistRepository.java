@@ -22,11 +22,11 @@ public final class CPlaylistRepository {
     }
 
     public static synchronized CPlaylistStorageStatus storageStatus() {
-        return STORE.status();
+        return STORE.status(currentSource());
     }
 
     public static synchronized boolean createPlaylist(String name) throws IOException {
-        return createPlaylist(name, CTrackSourceType.SOUND_EVENT);
+        return createPlaylist(name, currentSource());
     }
 
     public static synchronized boolean createPlaylist(String name, CTrackSourceType type) throws IOException {
@@ -34,34 +34,31 @@ public final class CPlaylistRepository {
     }
 
     public static synchronized boolean deletePlaylist(String name) throws IOException {
-        return STORE.delete(name);
+        return STORE.delete(name, currentSource());
     }
 
     public static synchronized boolean exists(String name) throws IOException {
-        return STORE.names().contains(name);
+        return STORE.names(currentSource()).contains(name);
     }
 
     public static synchronized List<String> listPlaylistNames() throws IOException {
-        return STORE.names();
+        return STORE.names(currentSource());
     }
 
     public static synchronized List<PlaylistSummary> listPlaylistSummaries() throws IOException {
-        List<PlaylistSummary> summaries = new ArrayList<>();
-        STORE.readablePlaylists().forEach((name, data) -> summaries.add(
-            new PlaylistSummary(name, data.tracks().size(), data.modifiedAt(), data.sourceType())));
-        return summaries;
+        return listPlaylistSummaries(currentSource());
     }
 
     public static synchronized boolean movePlaylist(String name, int offset) throws IOException {
-        return STORE.move(name, offset);
+        return STORE.move(name, offset, currentSource());
     }
 
     public static synchronized Optional<CPlaylistData> getPlaylist(String name) throws IOException {
-        return STORE.get(name);
+        return STORE.get(name, currentSource());
     }
 
     public static synchronized List<Identifier> getSoundEventPlaylist(String name) throws IOException {
-        Optional<CPlaylistData> playlist = STORE.get(name);
+        Optional<CPlaylistData> playlist = STORE.get(name, CTrackSourceType.SOUND_EVENT);
         if (playlist.isEmpty()) {
             return List.of();
         }
@@ -83,6 +80,37 @@ public final class CPlaylistRepository {
         throws IOException {
         STORE.rename(oldName, newName,
             new CPlaylistData(CTrackSourceType.SOUND_EVENT, tracks, System.currentTimeMillis()));
+    }
+
+    private static CTrackSourceType currentSource() {
+        return NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource();
+    }
+
+    public static synchronized List<String> listPlaylistNames(CTrackSourceType type) throws IOException {
+        return STORE.names(type);
+    }
+
+    public static synchronized List<PlaylistSummary> listPlaylistSummaries(CTrackSourceType type) throws IOException {
+        List<PlaylistSummary> summaries = new ArrayList<>();
+        STORE.readablePlaylists(type).forEach((name, data) -> summaries.add(
+            new PlaylistSummary(name, data.tracks().size(), data.modifiedAt(), type)));
+        return summaries;
+    }
+
+    public static synchronized Optional<CPlaylistData> getPlaylist(String name, CTrackSourceType type) throws IOException {
+        return STORE.get(name, type);
+    }
+
+    public static synchronized boolean deletePlaylist(String name, CTrackSourceType type) throws IOException {
+        return STORE.delete(name, type);
+    }
+
+    public static synchronized boolean movePlaylist(String name, int offset, CTrackSourceType type) throws IOException {
+        return STORE.move(name, offset, type);
+    }
+
+    public static synchronized void renamePlaylist(String oldName, String newName, CPlaylistData playlist) throws IOException {
+        STORE.rename(oldName, newName, playlist);
     }
 
     public static synchronized JsonObject exportPlaylists() throws IOException {

@@ -37,34 +37,34 @@ final class CPlaylistStore {
         this.path = path;
     }
 
-    synchronized CPlaylistStorageStatus status() {
+    synchronized CPlaylistStorageStatus status(CTrackSourceType type) {
         try {
-            read();
+            read(type);
         } catch (IOException ignored) {
         }
         return this.status;
     }
 
-    synchronized List<String> names() throws IOException {
-        return new ArrayList<>(read().rawPlaylists().keySet());
+    synchronized List<String> names(CTrackSourceType type) throws IOException {
+        return new ArrayList<>(read(type).rawPlaylists().keySet());
     }
 
-    synchronized Map<String, CPlaylistData> readablePlaylists() throws IOException {
-        return new LinkedHashMap<>(read().playlists());
+    synchronized Map<String, CPlaylistData> readablePlaylists(CTrackSourceType type) throws IOException {
+        return new LinkedHashMap<>(read(type).playlists());
     }
 
     synchronized JsonObject exportPlaylists() throws IOException {
-        return read().rawPlaylists().deepCopy();
+        return read(CTrackSourceType.SOUND_EVENT).root().getAsJsonObject("playlists").deepCopy();
     }
 
-    synchronized Optional<CPlaylistData> get(String name) throws IOException {
-        Document document = read();
+    synchronized Optional<CPlaylistData> get(String name, CTrackSourceType type) throws IOException {
+        Document document = read(type);
         requireReadable(document, name);
         return Optional.ofNullable(document.playlists().get(name));
     }
 
     synchronized boolean create(String name, CTrackSourceType type) throws IOException {
-        Document document = read();
+        Document document = read(type);
         if (document.rawPlaylists().has(name)) {
             return false;
         }
@@ -74,7 +74,7 @@ final class CPlaylistStore {
     }
 
     synchronized void save(String name, CPlaylistData playlist) throws IOException {
-        Document document = read();
+        Document document = read(playlist.sourceType());
         requireReadable(document, name);
         CPlaylistData existing = document.playlists().get(name);
         if (existing != null && existing.sourceType() != playlist.sourceType()) {
@@ -84,8 +84,8 @@ final class CPlaylistStore {
         publish(document, false);
     }
 
-    synchronized boolean delete(String name) throws IOException {
-        Document document = read();
+    synchronized boolean delete(String name, CTrackSourceType type) throws IOException {
+        Document document = read(type);
         requireReadable(document, name);
         if (document.rawPlaylists().remove(name) == null) {
             return false;
@@ -95,7 +95,7 @@ final class CPlaylistStore {
     }
 
     synchronized void rename(String oldName, String newName, CPlaylistData playlist) throws IOException {
-        Document document = read();
+        Document document = read(playlist.sourceType());
         requireReadable(document, oldName);
         CPlaylistData existing = document.playlists().get(oldName);
         if (existing == null || existing.sourceType() != playlist.sourceType()) {
@@ -110,13 +110,13 @@ final class CPlaylistStore {
             for (Map.Entry<String, JsonElement> entry : document.rawPlaylists().entrySet()) {
                 renamed.add(entry.getKey().equals(oldName) ? newName : entry.getKey(), entry.getValue());
             }
-            document.root().add("playlists", renamed);
+            document.root().getAsJsonObject("playlists").add(playlist.sourceType().name(), renamed);
         }
         publish(document, false);
     }
 
-    synchronized boolean move(String name, int offset) throws IOException {
-        Document document = read();
+    synchronized boolean move(String name, int offset, CTrackSourceType type) throws IOException {
+        Document document = read(type);
         requireReadable(document, name);
         List<String> names = new ArrayList<>(document.rawPlaylists().keySet());
         int current = names.indexOf(name);
@@ -130,27 +130,34 @@ final class CPlaylistStore {
         for (String entry : names) {
             reordered.add(entry, document.rawPlaylists().get(entry));
         }
-        document.root().add("playlists", reordered);
+        document.root().getAsJsonObject("playlists").add(type.name(), reordered);
         publish(document, false);
         return true;
     }
 
     synchronized void importPlaylists(List<CPlaylistRepository.ImportPlaylist> playlists) throws IOException {
-        Document document = read();
+        Document document = read(CTrackSourceType.SOUND_EVENT);
         for (CPlaylistRepository.ImportPlaylist playlist : playlists) {
-            if (document.rawPlaylists().has(playlist.name())) {
+            Document group = view(document, playlist.sourceType());
+            if (group.rawPlaylists().has(playlist.name())) {
                 throw new CPlaylistStorageException(CPlaylistStorageException.Reason.NAME_CONFLICT);
             }
-            put(document, playlist.name(), new CPlaylistData(playlist.sourceType(), playlist.tracks(), playlist.modifiedAt()));
+            put(group, playlist.name(), new CPlaylistData(playlist.sourceType(), playlist.tracks(), playlist.modifiedAt()));
         }
-        if (!playlists.isEmpty()) {
-            publish(document, false);
-        }
+        if (!playlists.isEmpty()) publish(document, false);
     }
 
-    private Document read() throws IOException {
+    private static Document view(Document document, CTrackSourceType type) throws IOException {
+        JsonObject groups = document.root().getAsJsonObject("playlists");
+        JsonElement raw = groups.get(type.name());
+        if (raw == null) groups.add(type.name(), new JsonObject());
+        else if (!(raw instanceof JsonObject)) throw new CPlaylistStorageException(CPlaylistStorageException.Reason.INVALID_DATA);
+        return new Document(document.root(), new LinkedHashMap<>(), document.original(), type, document.version());
+    }
+
+    private Document read(CTrackSourceType type) throws IOException {
         try {
-            return readDocument();
+            return readDocument(type);
         } catch (CPlaylistStorageException exception) {
             CPlaylistStorageStatus.State state = exception.reason() == CPlaylistStorageException.Reason.UNSUPPORTED_VERSION
                 ? CPlaylistStorageStatus.State.UNSUPPORTED_VERSION : CPlaylistStorageStatus.State.INVALID_DATA;
@@ -165,7 +172,7 @@ final class CPlaylistStore {
         }
     }
 
-    private Document readDocument() throws IOException {
+    private Document readDocument(CTrackSourceType type) throws IOException {
         BasicFileAttributes attributes;
         try {
             attributes = Files.readAttributes(this.path, BasicFileAttributes.class);
@@ -174,7 +181,7 @@ final class CPlaylistStore {
             root.addProperty("formatVersion", CPlaylistFormat.CURRENT_VERSION);
             root.add("playlists", new JsonObject());
             this.status = new CPlaylistStorageStatus(CPlaylistStorageStatus.State.MISSING, List.of());
-            return new Document(root, new LinkedHashMap<>(), null);
+            return view(new Document(root, new LinkedHashMap<>(), null, type, CPlaylistFormat.CURRENT_VERSION), type);
         }
         if (!attributes.isRegularFile()) {
             throw new IOException("Unreadable storage");
@@ -196,38 +203,46 @@ final class CPlaylistStore {
         if (!(root.get("playlists") instanceof JsonObject rawPlaylists)) {
             throw new CPlaylistStorageException(CPlaylistStorageException.Reason.INVALID_DATA);
         }
-        LinkedHashMap<String, CPlaylistData> playlists = new LinkedHashMap<>();
-        List<String> unreadable = new ArrayList<>();
         long fallbackTime = Math.max(0L, attributes.lastModifiedTime().toMillis());
-        for (Map.Entry<String, JsonElement> entry : rawPlaylists.entrySet()) {
-            CPlaylistData playlist = parse(entry.getValue(), version, fallbackTime);
-            if (playlist == null) {
-                unreadable.add(entry.getKey());
-            } else {
-                playlists.put(entry.getKey(), playlist);
-            }
-        }
-        Document document = new Document(root, playlists, original);
-        if (version == 1) {
-            for (Map.Entry<String, CPlaylistData> entry : playlists.entrySet()) {
-                JsonElement old = rawPlaylists.get(entry.getKey());
-                JsonObject migrated;
-                if (old instanceof JsonObject object) {
-                    migrated = object;
-                } else {
-                    migrated = new JsonObject();
-                    migrated.add("tracks", old);
+        if (version < 3) {
+            JsonObject groups = new JsonObject();
+            JsonObject unknown = new JsonObject();
+            for (Map.Entry<String, JsonElement> entry : rawPlaylists.entrySet()) {
+                CTrackSourceType source = CPlaylistFormat.sourceType(entry.getValue(), version);
+                if (source == null) {
+                    unknown.add(entry.getKey(), entry.getValue());
+                    continue;
                 }
-                migrated.addProperty("sourceType", CTrackSourceType.SOUND_EVENT.name());
-                migrated.addProperty("modifiedAt", entry.getValue().modifiedAt());
-                rawPlaylists.add(entry.getKey(), migrated);
+                if (!groups.has(source.name())) groups.add(source.name(), new JsonObject());
+                JsonElement value = entry.getValue();
+                if (version == 1) {
+                    CPlaylistData parsedPlaylist = parse(value, version, fallbackTime);
+                    if (parsedPlaylist != null) {
+                        JsonObject migrated = value instanceof JsonObject object ? object : new JsonObject();
+                        if (value instanceof JsonArray) migrated.add("tracks", value);
+                        migrated.addProperty("sourceType", source.name());
+                        migrated.addProperty("modifiedAt", parsedPlaylist.modifiedAt());
+                        value = migrated;
+                    }
+                }
+                groups.getAsJsonObject(source.name()).add(entry.getKey(), value);
             }
+            if (!unknown.isEmpty()) groups.add("UNKNOWN_LEGACY", unknown);
+            root.add("playlists", groups);
             root.addProperty("formatVersion", CPlaylistFormat.CURRENT_VERSION);
-            publish(document, true);
+            publish(new Document(root, new LinkedHashMap<>(), original, type, version), true);
+            return readDocument(type);
+        }
+        Document document = view(new Document(root, new LinkedHashMap<>(), original, type, version), type);
+        List<String> unreadable = new ArrayList<>();
+        for (Map.Entry<String, JsonElement> entry : document.rawPlaylists().entrySet()) {
+            CPlaylistData playlist = parse(entry.getValue(), version, fallbackTime);
+            if (playlist == null || playlist.sourceType() != type) unreadable.add(entry.getKey());
+            else document.playlists().put(entry.getKey(), playlist);
         }
         this.status = new CPlaylistStorageStatus(unreadable.isEmpty()
             ? CPlaylistStorageStatus.State.READY : CPlaylistStorageStatus.State.PARTIAL, unreadable);
-        return version == 1 ? readDocument() : document;
+        return document;
     }
 
     private static CPlaylistData parse(JsonElement element, int version, long fallbackTime) {
@@ -289,7 +304,7 @@ final class CPlaylistStore {
             Files.writeString(temporary, GSON.toJson(document.root()), StandardCharsets.UTF_8);
             verifyUnchanged(document.original());
             if (migration) {
-                archive(document.original());
+                archive(document.original(), document.version());
                 verifyUnchanged(document.original());
             }
             Files.move(temporary, this.path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
@@ -310,8 +325,8 @@ final class CPlaylistStore {
         }
     }
 
-    private void archive(byte[] original) throws IOException {
-        Path archive = this.path.resolveSibling(this.path.getFileName() + ".migrated");
+    private void archive(byte[] original, int version) throws IOException {
+        Path archive = this.path.resolveSibling(this.path.getFileName() + (version == 1 ? ".migrated" : ".v" + version + ".migrated"));
         try {
             byte[] existing = Files.readAllBytes(archive);
             if (!Arrays.equals(original, existing)) {
@@ -329,9 +344,9 @@ final class CPlaylistStore {
         }
     }
 
-    private record Document(JsonObject root, LinkedHashMap<String, CPlaylistData> playlists, byte[] original) {
+    private record Document(JsonObject root, LinkedHashMap<String, CPlaylistData> playlists, byte[] original, CTrackSourceType type, int version) {
         JsonObject rawPlaylists() {
-            return this.root.getAsJsonObject("playlists");
+            return this.root.getAsJsonObject("playlists").getAsJsonObject(this.type.name());
         }
     }
 }

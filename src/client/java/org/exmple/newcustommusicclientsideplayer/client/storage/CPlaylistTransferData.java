@@ -15,7 +15,7 @@ public final class CPlaylistTransferData {
     private String modVersion = "";
     private String minecraftVersion = "";
     private long exportedAt;
-    private LinkedHashMap<String, Playlist> playlists = new LinkedHashMap<>();
+    private LinkedHashMap<String, Map<String, Playlist>> playlists = new LinkedHashMap<>();
 
     CPlaylistTransferData() {
     }
@@ -24,7 +24,7 @@ public final class CPlaylistTransferData {
         String modVersion,
         String minecraftVersion,
         long exportedAt,
-        Map<String, Playlist> playlists
+        Map<String, Map<String, Playlist>> playlists
     ) {
         this.modVersion = Objects.requireNonNull(modVersion, "modVersion");
         this.minecraftVersion = Objects.requireNonNull(minecraftVersion, "minecraftVersion");
@@ -52,7 +52,7 @@ public final class CPlaylistTransferData {
         return this.exportedAt;
     }
 
-    public Map<String, Playlist> playlists() {
+    public Map<String, Map<String, Playlist>> playlists() {
         return new LinkedHashMap<>(this.playlists);
     }
 

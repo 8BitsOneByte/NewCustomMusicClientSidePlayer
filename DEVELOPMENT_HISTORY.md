@@ -463,6 +463,20 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 - For an original path such as `the_seas` renamed to `sea`, searching for `sea` highlights the entire visible name in green. Searching for `seas` or `the_` still finds the track through its underlying path, but leaves the visible `sea` in its custom-name color.
 - Empty and whitespace-only searches show the ordinary result list without highlighting. Changing or clearing the query rebuilds the visible results and their matching spans.
 
+### Source-isolated playlists and OGG playlist screens
+
+- Advanced local playlist storage and exports to format version 3, grouping playlists by track source. Sound-event and OGG playlists now have independent, case-sensitive names and ordering.
+- Migrate legacy version 1 and version 2 playlists into their source groups. Preserve original bytes in migration archives, retain unknown data and unreadable entries, and check for external file changes before atomic replacement.
+- Apply source-specific names to creation, rename, deletion, reordering, command lookup, completion, and import collision handling. Import warnings remain separate when both sources contain the same playlist name.
+- Capture the selected source when opening playlist screens and display the source indicator at the upper left. Carry that source through track viewing, editing, renaming, playback preview, and playback.
+- Browse effective OGG resources in the editor using the single-track filename ordering and default-name ambiguity rules. Refresh the available resources after catalog replacement while retaining the playlist's saved order.
+- Display custom track names in yellow in the editor, playback preview, and View Playlist Tracks. Describe each row as a sound event or music file according to its source.
+
+### Playlist search highlighting
+
+- Highlight all visible matches in green when searching playlist names or the editor's available tracks. Both searches use literal, case-insensitive matching and include overlapping occurrences.
+- The editor searches original resource paths and source-specific display names. Green matches take precedence within custom names; unmatched text retains its yellow or white color. A match found only in a hidden resource path keeps the displayed name in its ordinary color.
+
 ### Verification record
 
 - On October 3, `compileClientJava --offline` passed using Java 25, Minecraft 26.3, Fabric Loader 0.19.5, and Fabric API `0.161.0+26.3`.
@@ -477,3 +491,5 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 - Static JSON validation covered eighteen name-import fixtures and five local-name-storage fixtures, including legacy versions, grouped source data, unknown groups, repeated IDs, invalid names, unreadable local groups, and future-version data.
 - The direct-sound implementation was checked against Minecraft 26.3 class signatures for `getOrResolve`, the selected `sound`, and the stored `soundEvent`. Source review also traced source capture through single-track commands, playlist commands, and graphical playback, and checked the source setting's persistence, draft comparison, discard formatter, and widget synchronization.
 - Source review traced single-track source selection through playback confirmation and name editing, checked OGG filename ambiguity and parent-directory ordering, and verified that restoration removes the mapping before regenerating its label. Language JSON validation checked the singular translation keys, their `%s` placeholders, and the absence of obsolete source references.
+- Java syntax parsing completed for all 96 client source files with no diagnostics. Source review traced playlist source selection through graphical actions, command lookup, migration, grouped transfer, and playback.
+- Java syntax parsing completed for all 96 client source files with no diagnostics after the playlist search changes. Source review checked empty and whitespace-only queries, literal matching, overlapping matches, hidden-path matches, and custom-name color precedence.

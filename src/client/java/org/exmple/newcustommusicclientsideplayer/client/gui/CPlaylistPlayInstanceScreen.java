@@ -25,6 +25,8 @@ import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundContr
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
 import org.jspecify.annotations.Nullable;
 
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
+
 public final class CPlaylistPlayInstanceScreen extends Screen {
     private static final int LIST_MIN_WIDTH = 220;
     private static final int LIST_ROW_HEIGHT = 36;
@@ -45,6 +47,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
     private static final Component START_INDEX_HINT = Component.translatable("screen.custommusicclientsideplayer.play_instance.start_index_hint").withStyle(EditBox.SEARCH_HINT_STYLE);
     private static final Tooltip SHUFFLE_REQUIRES_LOOP_TOOLTIP = Tooltip.create(Component.translatable("screen.newcustommusicclientsideplayer.play_instance.shuffle_requires_loop"));
 
+    private final CTrackSourceType sourceType;
     private final Screen parent;
     private final List<Identifier> tracks;
     private final StartAction onStart;
@@ -73,7 +76,12 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
     }
 
     public CPlaylistPlayInstanceScreen(Screen parent, String playlistName, List<Identifier> tracks, StartAction onStart) {
+        this(parent, playlistName, tracks, onStart, NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource());
+    }
+
+    public CPlaylistPlayInstanceScreen(Screen parent, String playlistName, List<Identifier> tracks, StartAction onStart, CTrackSourceType sourceType) {
         super(Component.translatable("screen.custommusicclientsideplayer.play_instance.title"));
+        this.sourceType = sourceType;
         this.parent = parent;
         this.tracks = List.copyOf(tracks);
         this.onStart = onStart;
@@ -81,7 +89,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
 
     @Override
     protected void init() {
-        Set<String> namespaces = this.minecraft.getSoundManager().getAvailableSounds().stream().map(Identifier::getNamespace).collect(Collectors.toSet());
+        Set<String> namespaces = CTrackSourcePresentation.resources(this.minecraft, this.sourceType).stream().map(Identifier::getNamespace).collect(Collectors.toSet());
         this.availableNamespaces.clear();
         if (!namespaces.isEmpty()) {
             this.availableNamespaces.addAll(namespaces);
@@ -203,6 +211,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
+        CTrackSourcePresentation.header(guiGraphics, this.minecraft, this.sourceType);
 
         guiGraphics.centeredText(this.font, this.title, this.width / 2, 20, 0xFFFFFFFF);
         guiGraphics.centeredText(this.font, Component.translatable("screen.custommusicclientsideplayer.play_instance.preview"), this.previewLabelCenterX, this.previewLabelY, 0xFFFFFFFF);
@@ -328,7 +337,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
         boolean hasPlayableTrackAtOrAfterStart = false;
 
         for (int index = 0; index < this.tracks.size(); index++) {
-            if (!CPlaySoundController.isTrackPlayable(this.minecraft, this.tracks.get(index))) {
+            if (!CPlaySoundController.isTrackPlayable(this.minecraft, this.tracks.get(index), this.sourceType)) {
                 continue;
             }
 
@@ -387,12 +396,8 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
         this.minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
     }
 
-    private static String getDisplayName(Identifier id) {
-        return CTrackNameRepository.getDisplayName(id);
-    }
-
-    private static Component buildDescription(Identifier id) {
-        return Component.translatable("screen.custommusicclientsideplayer.common.music_file_from", Component.literal(id.getNamespace()).withStyle(style -> style.withBold(true)));
+    private String getDisplayName(Identifier id) {
+        return CTrackNameRepository.getDisplayName(this.sourceType, id);
     }
 
     private static final class TrackPreviewList extends ObjectSelectionList<TrackPreviewList.Entry> {
@@ -470,7 +475,7 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
             public void extractContent(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, boolean hovered, float delta) {
                 Font font = this.screen.font;
                 boolean missingNamespace = !this.screen.availableNamespaces.contains(this.track.getNamespace());
-                boolean unplayableTrack = !CPlaySoundController.isTrackPlayable(this.screen.minecraft, this.track);
+                boolean unplayableTrack = !CPlaySoundController.isTrackPlayable(this.screen.minecraft, this.track, this.screen.sourceType);
                 if (missingNamespace || unplayableTrack) {
                     guiGraphics.fill(this.getContentX() - 1, this.getContentY() - 1, this.getContentRight() + 1, this.getContentBottom() + 1, COLOR_INCOMPATIBLE_ROW);
                 }
@@ -479,8 +484,8 @@ public final class CPlaylistPlayInstanceScreen extends Screen {
                 guiGraphics.blit(RenderPipelines.GUI_TEXTURED, icon, this.getContentX(), this.getContentY(), 0.0F, 0.0F, PREVIEW_ICON_SIZE, PREVIEW_ICON_SIZE, PREVIEW_ICON_SIZE, PREVIEW_ICON_SIZE);
 
                 int textX = this.getContentX() + 34;
-                guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, CPlaylistPlayInstanceScreen.getDisplayName(this.track)), textX, this.getContentY() + 1, 0xFFFFFFFF, false);
-                guiGraphics.text(font, CPlaylistPlayInstanceScreen.buildDescription(this.track), textX, this.getContentY() + 12, 0xFF808080, false);
+                guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, this.screen.getDisplayName(this.track)), textX, this.getContentY() + 1, CTrackSourcePresentation.nameColor(this.screen.sourceType, this.track), false);
+                guiGraphics.text(font, CTrackSourcePresentation.description(this.screen.sourceType, this.track), textX, this.getContentY() + 12, 0xFF808080, false);
 
                 if (hovered) {
                     if (missingNamespace) {

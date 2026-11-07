@@ -14,6 +14,9 @@ import net.minecraft.network.chat.Component;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistRepository;
 import org.jspecify.annotations.Nullable;
 
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
+import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+
 public final class CCreatePlaylistScreen extends Screen {
     private static final int MAX_PLAYLIST_NAME_LENGTH = 50;
     private static final int INPUT_MAX_LENGTH = 60;
@@ -25,6 +28,7 @@ public final class CCreatePlaylistScreen extends Screen {
     private static final Component TOO_LONG_NAME_ERROR = Component.translatable("screen.custommusicclientsideplayer.error.playlist_name_too_long");
     private static final Component NAME_HINT = Component.translatable("screen.custommusicclientsideplayer.playlist_name_hint");
 
+    private final CTrackSourceType sourceType;
     private final Screen lastScreen;
     private final Runnable onCreated;
     private final Set<String> existingNames = new HashSet<>();
@@ -33,7 +37,12 @@ public final class CCreatePlaylistScreen extends Screen {
     private Button createButton;
 
     public CCreatePlaylistScreen(Screen lastScreen, Runnable onCreated) {
+        this(lastScreen, onCreated, NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource());
+    }
+
+    public CCreatePlaylistScreen(Screen lastScreen, Runnable onCreated, CTrackSourceType sourceType) {
         super(TITLE);
+        this.sourceType = sourceType;
         this.lastScreen = lastScreen;
         this.onCreated = onCreated;
     }
@@ -71,6 +80,7 @@ public final class CCreatePlaylistScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
+        CTrackSourcePresentation.header(guiGraphics, this.minecraft, this.sourceType);
         guiGraphics.centeredText(this.font, this.title, this.width / 2, 50, -1);
         guiGraphics.centeredText(this.font, NAME_LABEL, this.width / 2, 142, -1);
     }
@@ -78,7 +88,7 @@ public final class CCreatePlaylistScreen extends Screen {
     private void loadExistingNames() {
         this.existingNames.clear();
         try {
-            List<String> names = CPlaylistRepository.listPlaylistNames();
+            List<String> names = CPlaylistRepository.listPlaylistNames(this.sourceType);
             this.existingNames.addAll(names);
         } catch (IOException ignored) {
         }
@@ -117,7 +127,7 @@ public final class CCreatePlaylistScreen extends Screen {
 
         String playlistName = this.nameEdit.getValue().trim();
         try {
-            boolean created = CPlaylistRepository.createPlaylist(playlistName);
+            boolean created = CPlaylistRepository.createPlaylist(playlistName, this.sourceType);
             if (!created) {
                 this.createButton.active = false;
                 this.createButton.setTooltip(Tooltip.create(DUPLICATE_NAME_ERROR));

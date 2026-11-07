@@ -162,7 +162,31 @@ public final class CPlaylistTransferService {
                 throw CPlaylistImportException.invalidPlaylistFile();
             }
 
-            return new ParsedTransferFile(modId, playlists, CPlaylistFormat.version(formatVersion));
+            int version = CPlaylistFormat.version(formatVersion);
+            if (version >= 3) {
+                List<RawPlaylistEntry> flattened = new ArrayList<>();
+                for (RawPlaylistEntry group : playlists) {
+                    CTrackSourceType type;
+                    try { type = CTrackSourceType.valueOf(group.name()); }
+                    catch (IllegalArgumentException exception) {
+                        flattened.add(new RawPlaylistEntry(group.name(), com.google.gson.JsonNull.INSTANCE));
+                        continue;
+                    }
+                    if (!(group.value() instanceof JsonObject)) {
+                        flattened.add(new RawPlaylistEntry(group.name(), com.google.gson.JsonNull.INSTANCE));
+                        continue;
+                    }
+                    for (RawPlaylistEntry entry : group.children()) {
+                        JsonElement value = entry.value().deepCopy();
+                        if (value instanceof JsonObject object
+                            && CPlaylistFormat.sourceType(object, version) == type) {
+                            flattened.add(new RawPlaylistEntry(entry.name(), object));
+                        } else flattened.add(new RawPlaylistEntry(entry.name(), com.google.gson.JsonNull.INSTANCE));
+                    }
+                }
+                playlists = flattened;
+            }
+            return new ParsedTransferFile(modId, playlists, version);
         } catch (CPlaylistStorageException exception) {
             if (exception.reason() == CPlaylistStorageException.Reason.UNSUPPORTED_VERSION) {
                 throw CPlaylistImportException.unsupportedVersion();
@@ -180,8 +204,12 @@ public final class CPlaylistTransferService {
         jsonReader.beginObject();
         while (jsonReader.hasNext()) {
             String playlistName = jsonReader.nextName();
-            JsonElement playlistElement = JsonParser.parseReader(jsonReader);
-            entries.add(new RawPlaylistEntry(playlistName, playlistElement));
+            if (jsonReader.peek() == JsonToken.BEGIN_OBJECT) {
+                List<RawPlaylistEntry> children = readPlaylistEntries(jsonReader);
+                JsonObject object = new JsonObject();
+                children.forEach(child -> object.add(child.name(), child.value()));
+                entries.add(new RawPlaylistEntry(playlistName, object, children));
+            } else entries.add(new RawPlaylistEntry(playlistName, JsonParser.parseReader(jsonReader)));
         }
         jsonReader.endObject();
 
@@ -195,8 +223,28 @@ public final class CPlaylistTransferService {
     }
 
     private CPlaylistImportPreview scanPlaylists(List<RawPlaylistEntry> playlistEntries, int version) throws CPlaylistImportException {
-        List<String> existingNames = readExistingPlaylistNames();
-        Set<String> occupiedNames = new HashSet<>(existingNames);
+        List<CPlaylistImportPreview.PlaylistToImport> all = new ArrayList<>();
+        Map<CTrackSourceType, CPlaylistImportPreview> groups = new java.util.EnumMap<>(CTrackSourceType.class);
+        List<String> skipped = new ArrayList<>();
+        for (int i = 0; i < playlistEntries.size(); i++) {
+            RawPlaylistEntry entry = playlistEntries.get(i);
+            if (normalizePlaylistName(entry.name()) == null || CPlaylistFormat.sourceType(entry.value(), version) == null)
+                skipped.add(Integer.toString(i + 1));
+        }
+        for (CTrackSourceType type : CTrackSourceType.values()) {
+            var entries = playlistEntries.stream().filter(entry -> normalizePlaylistName(entry.name()) != null
+                && CPlaylistFormat.sourceType(entry.value(), version) == type).toList();
+            CPlaylistImportPreview group = scanSource(entries, version, type);
+            groups.put(type, group);
+            all.addAll(group.playlists());
+        }
+        if (all.isEmpty()) throw CPlaylistImportException.noCompatiblePlaylists();
+        return new CPlaylistImportPreview(all, skipped, List.of(), Map.of(), List.of(), List.of(), groups);
+    }
+
+    private CPlaylistImportPreview scanSource(List<RawPlaylistEntry> playlistEntries, int version,
+        CTrackSourceType type) throws CPlaylistImportException {
+        Set<String> occupiedNames = new HashSet<>(readExistingPlaylistNames(type));
 
         List<CPlaylistImportPreview.PlaylistToImport> playlists = new ArrayList<>();
         List<String> skippedPlaylistEntries = new ArrayList<>();
@@ -240,10 +288,6 @@ public final class CPlaylistTransferService {
             ));
         }
 
-        if (playlists.isEmpty()) {
-            throw CPlaylistImportException.noCompatiblePlaylists();
-        }
-
         return new CPlaylistImportPreview(
             playlists,
             skippedPlaylistEntries,
@@ -254,9 +298,9 @@ public final class CPlaylistTransferService {
         );
     }
 
-    private List<String> readExistingPlaylistNames() throws CPlaylistImportException {
+    private List<String> readExistingPlaylistNames(CTrackSourceType type) throws CPlaylistImportException {
         try {
-            return this.store.names();
+            return this.store.names(type);
         } catch (IOException exception) {
             throw CPlaylistImportException.ioError(exception);
         }
@@ -406,6 +450,9 @@ public final class CPlaylistTransferService {
     private record ParsedTransferFile(String modId, List<RawPlaylistEntry> playlists, int version) {
     }
 
-    private record RawPlaylistEntry(String name, JsonElement value) {
+    private record RawPlaylistEntry(String name, JsonElement value, List<RawPlaylistEntry> children) {
+        RawPlaylistEntry(String name, JsonElement value) {
+            this(name, value, List.of());
+        }
     }
 }

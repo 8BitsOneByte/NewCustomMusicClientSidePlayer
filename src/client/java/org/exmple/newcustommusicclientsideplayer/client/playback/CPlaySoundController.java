@@ -381,6 +381,10 @@ public final class CPlaySoundController {
     }
 
     public static int playPlaylistFromUi(Minecraft client, String name, List<Identifier> playlist, boolean loop, boolean shuffle, int startTrackIndex) {
+        return playPlaylistFromUi(client, name, playlist, loop, shuffle, startTrackIndex, CTrackSourceType.SOUND_EVENT);
+    }
+
+    public static int playPlaylistFromUi(Minecraft client, String name, List<Identifier> playlist, boolean loop, boolean shuffle, int startTrackIndex, CTrackSourceType type) {
         if (client.level == null) {
             if (client.player != null) {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.no_client_world"));
@@ -397,7 +401,7 @@ public final class CPlaySoundController {
             return 0;
         }
 
-        List<Identifier> playablePlaylist = filterPlayableSounds(client, playlist, CTrackSourceType.SOUND_EVENT);
+        List<Identifier> playablePlaylist = filterPlayableSounds(client, playlist, type);
         if (playablePlaylist.isEmpty()) {
             if (client.player != null) {
                 client.player.sendSystemMessage(Component.translatable("message.custommusicclientsideplayer.no_playable_sound"));
@@ -406,7 +410,7 @@ public final class CPlaySoundController {
             return 0;
         }
 
-        List<Integer> displayIndices = buildPlayableDisplayIndices(client, playlist, CTrackSourceType.SOUND_EVENT);
+        List<Integer> displayIndices = buildPlayableDisplayIndices(client, playlist, type);
         int startQueueIndex = findStartQueueIndex(displayIndices, startTrackIndex, loop);
         if (startQueueIndex < 0) {
             if (client.player != null) {
@@ -418,7 +422,7 @@ public final class CPlaySoundController {
 
         forceStopTrackedSound(client);
 
-        sessionSource = CTrackSourceType.SOUND_EVENT;
+        sessionSource = type;
         playlistQueue = playablePlaylist;
         playlistDisplayIndices = displayIndices;
         playlistNextIndex = startQueueIndex;

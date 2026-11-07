@@ -17,6 +17,9 @@ import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistReposit
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
+import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+
 @NullMarked
 public final class CRenamePlaylistScreen extends Screen {
     private static final int MAX_PLAYLIST_NAME_LENGTH = 50;
@@ -30,6 +33,7 @@ public final class CRenamePlaylistScreen extends Screen {
     private static final Component TOO_LONG_NAME_ERROR = Component.translatable("screen.custommusicclientsideplayer.error.playlist_name_too_long");
     private static final Component NAME_HINT = Component.translatable("screen.custommusicclientsideplayer.playlist_name_hint");
 
+    private final CTrackSourceType sourceType;
     private final Screen lastScreen;
     private final String originalName;
     private final Consumer<String> onRename;
@@ -41,7 +45,12 @@ public final class CRenamePlaylistScreen extends Screen {
     private Button renameButton;
 
     public CRenamePlaylistScreen(Screen lastScreen, String originalName, Consumer<String> onRename) {
+        this(lastScreen, originalName, onRename, NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource());
+    }
+
+    public CRenamePlaylistScreen(Screen lastScreen, String originalName, Consumer<String> onRename, CTrackSourceType sourceType) {
         super(TITLE);
+        this.sourceType = sourceType;
         this.lastScreen = lastScreen;
         this.originalName = originalName;
         this.onRename = onRename;
@@ -82,6 +91,7 @@ public final class CRenamePlaylistScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
+        CTrackSourcePresentation.header(guiGraphics, this.minecraft, this.sourceType);
         guiGraphics.centeredText(this.font, this.title, this.width / 2, 50, -1);
         guiGraphics.centeredText(this.font, NAME_LABEL, this.width / 2, 142, -1);
     }
@@ -89,7 +99,7 @@ public final class CRenamePlaylistScreen extends Screen {
     private void loadExistingNames() {
         this.existingNames.clear();
         try {
-            List<String> names = CPlaylistRepository.listPlaylistNames();
+            List<String> names = CPlaylistRepository.listPlaylistNames(this.sourceType);
             this.existingNames.addAll(names);
         } catch (IOException ignored) {
         }

@@ -23,6 +23,8 @@ import org.exmple.newcustommusicclientsideplayer.client.bootstrap.Newcustommusic
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
 
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
+
 public final class CPlaylistTracksViewScreen extends Screen {
     private static final Identifier MC_MUS_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/mc_mus_icon.png");
     private static final Identifier OTHER_MUS_ICON = Identifier.fromNamespaceAndPath(NewcustommusicclientsideplayerClient.MOD_ID, "textures/gui/other_mus_icon.png");
@@ -30,6 +32,7 @@ public final class CPlaylistTracksViewScreen extends Screen {
     private static final Component UNKNOWN_NAMESPACE_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.common.unknown_namespace_track");
     private static final Component UNPLAYABLE_TRACK_TOOLTIP = Component.translatable("screen.custommusicclientsideplayer.common.unplayable_track");
 
+    private final CTrackSourceType sourceType;
     private final Screen parent;
     private final String playlistName;
     private final List<Identifier> tracks;
@@ -40,7 +43,12 @@ public final class CPlaylistTracksViewScreen extends Screen {
     private Button renameTrackButton;
 
     public CPlaylistTracksViewScreen(Screen parent, String playlistName, List<Identifier> tracks) {
+        this(parent, playlistName, tracks, NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource());
+    }
+
+    public CPlaylistTracksViewScreen(Screen parent, String playlistName, List<Identifier> tracks, CTrackSourceType sourceType) {
         super(Component.translatable("screen.custommusicclientsideplayer.view_tracks.title"));
+        this.sourceType = sourceType;
         this.parent = parent;
         this.playlistName = playlistName;
         this.tracks = new ArrayList<>(tracks);
@@ -48,9 +56,7 @@ public final class CPlaylistTracksViewScreen extends Screen {
 
     @Override
     protected void init() {
-        this.availableNamespaces = this.minecraft
-            .getSoundManager()
-            .getAvailableSounds()
+        this.availableNamespaces = CTrackSourcePresentation.resources(this.minecraft, this.sourceType)
             .stream()
             .map(Identifier::getNamespace)
             .collect(java.util.stream.Collectors.toSet());
@@ -92,12 +98,18 @@ public final class CPlaylistTracksViewScreen extends Screen {
     }
 
     @Override
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        CTrackSourcePresentation.header(graphics, this.minecraft, this.sourceType);
+    }
+
+    @Override
     public void onClose() {
         this.minecraft.gui.setScreen(this.parent);
     }
 
-    private static String getDisplayName(Identifier id) {
-        return CTrackNameRepository.getDisplayName(id);
+    private String getDisplayName(Identifier id) {
+        return CTrackNameRepository.getDisplayName(this.sourceType, id);
     }
 
     private void updateButtonStates() {
@@ -132,14 +144,14 @@ public final class CPlaylistTracksViewScreen extends Screen {
             }
         }
 
-        for (Identifier id : this.minecraft.getSoundManager().getAvailableSounds()) {
+        for (Identifier id : CTrackSourcePresentation.resources(this.minecraft, this.sourceType)) {
             if (id.getNamespace().equals(selectedTrack.getNamespace())) {
                 sameNamespaceTracks.add(id);
             }
         }
 
         this.minecraft.gui.setScreen(
-            new CRenameTrackScreen(this, selectedTrack, List.copyOf(sameNamespaceTracks), () -> this.trackSelectionList.setTracks(this.tracks))
+            new CRenameTrackScreen(this, selectedTrack, List.copyOf(sameNamespaceTracks), () -> this.trackSelectionList.setTracks(this.tracks), this.sourceType)
         );
     }
 
@@ -224,7 +236,7 @@ public final class CPlaylistTracksViewScreen extends Screen {
             public void extractContent(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, boolean hovered, float delta) {
                 Font font = this.screen.font;
                 boolean missingNamespace = !this.screen.availableNamespaces.contains(this.track.getNamespace());
-                boolean unplayableTrack = !CPlaySoundController.isTrackPlayable(this.screen.minecraft, this.track);
+                boolean unplayableTrack = !CPlaySoundController.isTrackPlayable(this.screen.minecraft, this.track, this.screen.sourceType);
                 if (missingNamespace || unplayableTrack) {
                     guiGraphics.fill(this.getContentX() - 1, this.getContentY() - 1, this.getContentRight() + 1, this.getContentBottom() + 1, COLOR_INCOMPATIBLE_ROW);
                 }
@@ -233,8 +245,8 @@ public final class CPlaylistTracksViewScreen extends Screen {
                 guiGraphics.blit(RenderPipelines.GUI_TEXTURED, icon, this.getContentX(), this.getContentY(), 0.0F, 0.0F, 32, 32, 32, 32);
 
                 int textX = this.getContentX() + 34;
-                guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, CPlaylistTracksViewScreen.getDisplayName(this.track)), textX, this.getContentY() + 1, 0xFFFFFFFF, false);
-                guiGraphics.text(font, buildDescription(this.track), textX, this.getContentY() + 12, 0xFF808080, false);
+                guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, this.screen.getDisplayName(this.track)), textX, this.getContentY() + 1, CTrackSourcePresentation.nameColor(this.screen.sourceType, this.track), false);
+                guiGraphics.text(font, CTrackSourcePresentation.description(this.screen.sourceType, this.track), textX, this.getContentY() + 12, 0xFF808080, false);
 
                 if (hovered) {
                     if (missingNamespace) {
@@ -254,10 +266,6 @@ public final class CPlaylistTracksViewScreen extends Screen {
             public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
                 this.screen.trackSelectionList.setSelected(this);
                 return true;
-            }
-
-            private static Component buildDescription(Identifier id) {
-                return Component.translatable("screen.custommusicclientsideplayer.view_tracks.music_file_from", Component.literal(id.getNamespace()).withStyle(style -> style.withBold(true)));
             }
         }
     }
