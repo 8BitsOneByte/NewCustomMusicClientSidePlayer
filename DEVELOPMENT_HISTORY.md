@@ -493,3 +493,41 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 - Source review traced single-track source selection through playback confirmation and name editing, checked OGG filename ambiguity and parent-directory ordering, and verified that restoration removes the mapping before regenerating its label. Language JSON validation checked the singular translation keys, their `%s` placeholders, and the absence of obsolete source references.
 - Java syntax parsing completed for all 96 client source files with no diagnostics. Source review traced playlist source selection through graphical actions, command lookup, migration, grouped transfer, and playback.
 - Java syntax parsing completed for all 96 client source files with no diagnostics after the playlist search changes. Source review checked empty and whitespace-only queries, literal matching, overlapping matches, hidden-path matches, and custom-name color precedence.
+
+## 1.5.2-beta1
+
+### Now-playing toast modes and pause-menu display
+
+- Replace the toast toggle with ON, ON++, and OFF. ON shows the temporary song-start toast; ON++ also displays the current track at the upper right of the pause menu. The enabled modes have separate English and Chinese tooltips.
+- Read the pause-menu title from the active mod playback instance and its captured track source. Update the title when tracks change and clear the display during custom pause, after playback stops or finishes, and when the current channel becomes invalid. Resuming restores the pause-menu display without starting a new temporary toast.
+- Reuse the temporary toast when a new track starts, refreshing its title and duration. The pause-menu card appears immediately without an entrance animation, and replaces the temporary card while the pause menu is open in ON++ mode. Both cards share the existing 200-pixel width limit and ellipsis truncation.
+- Store the selection as nowPlayingToastMode. Migrate the previous boolean setting and import older configuration exports as ON or OFF. New exports carry the selected mode; invalid imported modes retain the draft value and use the existing skipped-setting warning.
+- Include all three modes in draft editing, dirty-state comparison, applied-to-draft discard details, defaults, imported drafts, and widget synchronization. Apply saves and publishes the selection before updating the editable baseline.
+
+### Long playlist names in the playlist browser
+
+- Limit playlist names to the row's available text width and truncate overflowing names with Minecraft's ellipsis helper. Hovering over a truncated name displays its complete text. Visible search matches retain their green highlighting.
+
+### Clipped list names and styled full-name tooltips
+
+- Replace ellipsis truncation in the playlist browser with scissor clipping at the row's inner boundary. Apply the same name rendering to View Playlist Tracks, the playlist playback preview, and the single-track browser.
+- Intersect the name's drawing area with the row, list viewport, and screen. When a visible scrollbar overlaps that area, clip at its left edge. A list without a scrollbar reserves no extra scrollbar space.
+- Show a full-name tooltip only when the name is clipped and the pointer is over its visible text. Preserve green search matches and yellow custom-name styling in the tooltip. In playlist track views and playback previews, the name tooltip takes precedence over the existing unavailable-track warning while hovering over the clipped name.
+
+### Clipped track names in the playlist editor
+
+- Apply the shared name-clipping and full-name-tooltip rendering to both columns of the playlist editor. Tooltips retain yellow custom names and green search matches in the available-track column. The saved playlist column keeps its unfiltered name colors, and clipped-name tooltips take precedence over unavailable-track warnings on the name line.
+
+### Playlist-editor icon hit bounds
+
+- Reuse Minecraft's SelectableEntry hit tests for the playlist editor's add, remove, move-up, and move-down controls. Hover highlights and clicks use the same bounded 32-by-32 icon regions, so clicking track names or descriptions no longer triggers these controls.
+
+### Verification record
+
+- Java syntax parsing completed for all 98 client source files with no diagnostics. Language JSON validation and whitespace checks passed.
+- Source review covered Back and Esc, Keep Editing, explicit discard, Apply followed by further edits, defaults, and imported drafts. Minecraft 26.3 class signatures and toast animation timing were checked against the local client classes.
+- Java syntax parsing completed for all 98 client source files with no diagnostics after the playlist-browser changes. Source review checked the row boundary, short and overflowing names, tooltip hit areas, and search-highlight preservation; whitespace checks passed.
+- Java syntax parsing completed for all 99 client source files with no diagnostics after the clipped-name changes. Source review checked the four screen integrations, row and viewport bounds, scrollbar visibility and overlap, tooltip hit areas, styled components, and unavailable-track warning precedence; whitespace checks passed.
+- On November 8, runClient --offline compiled and launched the Minecraft 26.3 development client successfully. In-game OGG-source checks covered playlist browsing, the single-track browser, View Playlist Tracks, playlist playback preview, and both editor columns. Eight F2 captures recorded clipped names, styled full-name tooltips, a fully visible short name without a tooltip, and editor lists with and without a visible scrollbar.
+- Imported 26 test playlists across both source groups and five custom-name mappings during the UI checks. After closing the client, restored the four JSON files and options.txt from their original byte backups and verified all five SHA-256 hashes.
+- Java syntax parsing completed for all 99 client source files with no diagnostics. Source review compared the editor with Minecraft 26.3 resource-pack controls and the playlist browser's bounded rectangles, and checked the icon's outer edges and half-icon boundaries; whitespace checks passed.

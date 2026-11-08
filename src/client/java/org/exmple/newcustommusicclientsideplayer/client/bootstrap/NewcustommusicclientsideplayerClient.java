@@ -19,6 +19,8 @@ import org.exmple.newcustommusicclientsideplayer.client.audio.catalog.CAudioCata
 import org.exmple.newcustommusicclientsideplayer.client.audio.catalog.CAudioCatalogReloadListener;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigRepository;
+import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingToastMode;
+import org.exmple.newcustommusicclientsideplayer.client.customnowplayingtoast.CCustomNowPlayingToast;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPauseCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPlaySoundCommand;
@@ -177,6 +179,9 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
     public static void applyModConfig(CModConfig config) {
         modConfig = Objects.requireNonNull(config, "config");
         modConfigSavePending = false;
+        if (modConfig.nowPlayingToastMode() == CNowPlayingToastMode.OFF) {
+            CCustomNowPlayingToast.dismiss(Minecraft.getInstance());
+        }
         CPlaySoundController.setPlaybackVolumePercent(modConfig.playbackVolumePercent());
         CUpdateChecker.applyCheckForUpdates(modConfig.checkForUpdates());
     }

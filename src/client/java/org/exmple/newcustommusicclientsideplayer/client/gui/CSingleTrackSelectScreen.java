@@ -856,9 +856,13 @@ public final class CSingleTrackSelectScreen extends Screen {
                 guiGraphics.blit(RenderPipelines.GUI_TEXTURED, icon, this.getContentX(), this.getContentY(), 0.0F, 0.0F, 32, 32, 32, 32);
 
                 int textX = this.getContentX() + 34;
-                guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, CSingleTrackSelectScreen.this.highlightedName(this.id)), textX, this.getContentY() + 1,
+                CListNameRenderer.extract(guiGraphics, font,
+                    Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order",
+                        this.order, CSingleTrackSelectScreen.this.highlightedName(this.id)),
                     CTrackNameRepository.getCustomName(CSingleTrackSelectScreen.this.sourceType, this.id) == null
-                        ? COLOR_TEXT_WHITE : 0xFFFFFF55, false);
+                        ? COLOR_TEXT_WHITE : 0xFFFFFF55,
+                    textX, this.getContentY() + 1, this.getContentRight(), this.list,
+                    this.list.scrollBarX(), mouseX, mouseY);
                 guiGraphics.text(font, buildDescription(this.id), textX, this.getContentY() + 12, COLOR_TEXT_GRAY, false);
 
                 boolean showHoverOverlay = !this.list.minecraft.getLastInputType().isMouse() || hovered || this.list.getSelected() == this && this.list.isFocused();

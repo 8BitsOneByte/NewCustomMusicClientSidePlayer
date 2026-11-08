@@ -30,6 +30,7 @@ public final class CModConfigTransferService {
     private static final String MOD_ID_KEY = "modId";
     private static final String KEEP_PLAYING_IN_GAME_MENU_KEY = "keepPlayingInGameMenu";
     private static final String CHECK_FOR_UPDATES_KEY = "checkForUpdates";
+    private static final String NOW_PLAYING_TOAST_MODE_KEY = "nowPlayingToastMode";
     private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
     private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
     private static final String PLAYBACK_VOLUME_PERCENT_KEY = "playbackVolumePercent";
@@ -145,10 +146,21 @@ public final class CModConfigTransferService {
                 skippedFields.add(CHECK_FOR_UPDATES_KEY);
             }
         }
-        if (configObject.has(NOW_PLAYING_TOAST_ENABLED_KEY)) {
+        if (configObject.has(NOW_PLAYING_TOAST_MODE_KEY)) {
+            CNowPlayingToastMode mode = CModConfigRepository.parseNowPlayingToastMode(
+                configObject.get(NOW_PLAYING_TOAST_MODE_KEY)
+            );
+            if (mode != null) {
+                compatibleConfig = compatibleConfig.withNowPlayingToastMode(mode);
+                hasCompatibleSettings = true;
+            } else {
+                skippedFields.add(NOW_PLAYING_TOAST_MODE_KEY);
+            }
+        } else if (configObject.has(NOW_PLAYING_TOAST_ENABLED_KEY)) {
             JsonElement element = configObject.get(NOW_PLAYING_TOAST_ENABLED_KEY);
             if (element instanceof JsonPrimitive primitive && primitive.isBoolean()) {
-                compatibleConfig = compatibleConfig.withNowPlayingToastEnabled(primitive.getAsBoolean());
+                compatibleConfig = compatibleConfig.withNowPlayingToastMode(primitive.getAsBoolean()
+                    ? CNowPlayingToastMode.ON : CNowPlayingToastMode.OFF);
                 hasCompatibleSettings = true;
             } else {
                 skippedFields.add(NOW_PLAYING_TOAST_ENABLED_KEY);

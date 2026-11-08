@@ -836,7 +836,10 @@ public class CPlaylistConfigScreen extends Screen {
                 guiGraphics.blit(RenderPipelines.GUI_TEXTURED, LIST_ICON, this.getContentX(), this.getContentY(), 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
 
                 int textX = this.getContentX() + ICON_SIZE + 6;
-                guiGraphics.text(font, CTrackSourcePresentation.highlight(this.summary.name(), this.screen.searchPattern), textX, this.getContentY() + 1, 0xFFFFFFFF, false);
+                CListNameRenderer.extract(guiGraphics, font,
+                    CTrackSourcePresentation.highlight(this.summary.name(), this.screen.searchPattern), 0xFFFFFFFF,
+                    textX, this.getContentY() + 1, this.getContentRight(), this.screen.playlistSelectionList,
+                    this.screen.playlistSelectionList.scrollBarX(), mouseX, mouseY);
                 guiGraphics.text(font, buildDescription(this.summary), textX, this.getContentY() + 12, 0xFF808080, false);
 
                 boolean showOverlay = !this.screen.minecraft.getLastInputType().isMouse() || hovered;

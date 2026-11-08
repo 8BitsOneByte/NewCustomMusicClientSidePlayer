@@ -17,6 +17,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundSource;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
+import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingToastMode;
 import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedbackMode;
 import org.exmple.newcustommusicclientsideplayer.client.customnowplayingtoast.CCustomNowPlayingToast;
 import org.exmple.newcustommusicclientsideplayer.client.playback.access.CCancellableChannelHandle;
@@ -95,6 +96,26 @@ public final class CPlaySoundController {
 
     public static boolean isCustomPaused() {
         return customPaused;
+    }
+
+    public static CManagedSoundInstance currentSoundForMusicHints() {
+        CManagedSoundInstance current = OWNED_SOUNDS.current();
+        if (customPaused || current == null) {
+            return null;
+        }
+        Minecraft client = Minecraft.getInstance();
+        SoundEngine engine = ((SoundManagerAccessor) client.getSoundManager())
+            .newcustommusicclientsideplayer$getSoundEngine();
+        ChannelAccess.ChannelHandle handle = ((SoundEngineAccessor) engine)
+            .newcustommusicclientsideplayer$getInstanceToChannel().get(current);
+        return handle == null || handle.isStopped()
+            || ((CCancellableChannelHandle) handle).newcustommusicclientsideplayer$isCancelled()
+            ? null : current;
+    }
+
+    public static Component currentMusicHintTitle(CManagedSoundInstance current) {
+        Identifier id = current.getIdentifier();
+        return Component.literal(id.getNamespace() + "-" + getDisplayName(id));
     }
 
     public static boolean isPlaylistModeActive() {
@@ -227,6 +248,7 @@ public final class CPlaySoundController {
         }
 
         customPaused = true;
+        CCustomNowPlayingToast.dismiss(client);
         return PauseResult.PAUSED;
     }
 
@@ -513,6 +535,7 @@ public final class CPlaySoundController {
     }
 
     private static void stopInternal(Minecraft client, boolean stopSound) {
+        CCustomNowPlayingToast.dismiss(client);
         clearPlaylistSession();
         customPaused = false;
 
@@ -775,13 +798,14 @@ public final class CPlaySoundController {
     }
 
     private static void showCustomNowPlayingToast(Minecraft client, Identifier soundId) {
-        if (!NewcustommusicclientsideplayerClient.getModConfig().nowPlayingToastEnabled()) {
+        if (NewcustommusicclientsideplayerClient.getModConfig().nowPlayingToastMode() == CNowPlayingToastMode.OFF) {
             return;
         }
 
         CCustomNowPlayingToast.show(
             client,
-            Component.literal(soundId.getNamespace() + "-" + getDisplayName(soundId))
+            Component.literal(soundId.getNamespace() + "-" + getDisplayName(soundId)),
+            OWNED_SOUNDS.current()
         );
     }
 

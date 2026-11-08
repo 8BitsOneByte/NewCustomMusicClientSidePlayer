@@ -25,6 +25,7 @@ import org.exmple.newcustommusicclientsideplayer.client.bootstrap.Newcustommusic
 import org.exmple.newcustommusicclientsideplayer.client.config.CConfigImportException;
 import org.exmple.newcustommusicclientsideplayer.client.config.CConfigImportPreview;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
+import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingToastMode;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigEditSession;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigRepository;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigTransferService;
@@ -144,7 +145,7 @@ public final class CModConfigScreen extends Screen {
     private CycleButton<Boolean> keepPlayingInGameMenuButton;
     private CycleButton<CTrackSourceType> trackSourceButton;
     private CycleButton<Boolean> checkForUpdatesButton;
-    private CycleButton<Boolean> nowPlayingToastButton;
+    private CycleButton<CNowPlayingToastMode> nowPlayingToastButton;
     private CycleButton<CNowPlayingFeedbackMode> nowPlayingFeedbackButton;
     private AbstractWidget playbackVolumeSlider;
     private Button importButton;
@@ -196,11 +197,19 @@ public final class CModConfigScreen extends Screen {
                 )
         );
         this.nowPlayingToastButton = rows.addChild(
-            CycleButton.onOffBuilder(this.editSession.draft().nowPlayingToastEnabled())
+            CycleButton.<CNowPlayingToastMode>builder(
+                    CConfigDiscardChangeFormatter::toastModeLabel,
+                    this.editSession.draft().nowPlayingToastMode()
+                )
+                .withValues(CNowPlayingToastMode.values())
+                .withTooltip(mode -> mode == CNowPlayingToastMode.OFF ? null : Tooltip.create(
+                    Component.translatable("screen.custommusicclientsideplayer.mod_config.now_playing_toast."
+                        + (mode == CNowPlayingToastMode.ON ? "on_tooltip" : "on_plus_tooltip"))
+                ))
                 .create(
                     NOW_PLAYING_TOAST,
-                    (button, enabled) -> {
-                        this.editSession.setNowPlayingToastEnabled(enabled);
+                    (button, mode) -> {
+                        this.editSession.setNowPlayingToastMode(mode);
                         this.clearSaveError();
                         this.updateButtonStates();
                     }
@@ -636,7 +645,7 @@ public final class CModConfigScreen extends Screen {
             this.checkForUpdatesButton.setValue(this.editSession.draft().checkForUpdates());
         }
         if (this.nowPlayingToastButton != null) {
-            this.nowPlayingToastButton.setValue(this.editSession.draft().nowPlayingToastEnabled());
+            this.nowPlayingToastButton.setValue(this.editSession.draft().nowPlayingToastMode());
         }
         if (this.nowPlayingFeedbackButton != null) {
             this.nowPlayingFeedbackButton.setValue(this.editSession.draft().nowPlayingFeedbackMode());
@@ -656,7 +665,7 @@ public final class CModConfigScreen extends Screen {
             case "defaultTrackSource" -> TRACK_SOURCE;
             case "keepPlayingInGameMenu" -> KEEP_PLAYING_IN_GAME_MENU;
             case "checkForUpdates" -> CHECK_FOR_UPDATES;
-            case "nowPlayingToastEnabled" -> NOW_PLAYING_TOAST;
+            case "nowPlayingToastEnabled", "nowPlayingToastMode" -> NOW_PLAYING_TOAST;
             case "nowPlayingFeedbackMode" -> NOW_PLAYING_FEEDBACK;
             case "playbackVolumePercent" -> Component.translatable(PLAYBACK_VOLUME_KEY);
             default -> Component.literal(field);

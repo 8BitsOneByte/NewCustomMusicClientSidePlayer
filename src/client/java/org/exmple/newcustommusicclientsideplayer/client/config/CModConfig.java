@@ -5,7 +5,7 @@ import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType
 
 public record CModConfig(
     boolean checkForUpdates,
-    boolean nowPlayingToastEnabled,
+    CNowPlayingToastMode nowPlayingToastMode,
     CNowPlayingFeedbackMode nowPlayingFeedbackMode,
     int playbackVolumePercent,
     boolean keepPlayingInGameMenu,
@@ -14,7 +14,7 @@ public record CModConfig(
     public static final CTrackSourceType DEFAULT_TRACK_SOURCE = CTrackSourceType.OGG_RESOURCE;
     public static final boolean DEFAULT_KEEP_PLAYING_IN_GAME_MENU = false;
     public static final boolean DEFAULT_CHECK_FOR_UPDATES = true;
-    public static final boolean DEFAULT_NOW_PLAYING_TOAST_ENABLED = true;
+    public static final CNowPlayingToastMode DEFAULT_NOW_PLAYING_TOAST_MODE = CNowPlayingToastMode.ON;
     public static final CNowPlayingFeedbackMode DEFAULT_NOW_PLAYING_FEEDBACK_MODE = CNowPlayingFeedbackMode.CHAT;
     public static final int DEFAULT_PLAYBACK_VOLUME_PERCENT = 100;
     public static final int MIN_PLAYBACK_VOLUME_PERCENT = 0;
@@ -22,6 +22,7 @@ public record CModConfig(
     public static final int PLAYBACK_VOLUME_SHORTCUT_STEP_PERCENT = 5;
 
     public CModConfig {
+        Objects.requireNonNull(nowPlayingToastMode, "nowPlayingToastMode");
         Objects.requireNonNull(nowPlayingFeedbackMode, "nowPlayingFeedbackMode");
         Objects.requireNonNull(defaultTrackSource, "defaultTrackSource");
         playbackVolumePercent = clampPlaybackVolumePercent(playbackVolumePercent);
@@ -30,7 +31,7 @@ public record CModConfig(
     public static CModConfig defaults() {
         return new CModConfig(
             DEFAULT_CHECK_FOR_UPDATES,
-            DEFAULT_NOW_PLAYING_TOAST_ENABLED,
+            DEFAULT_NOW_PLAYING_TOAST_MODE,
             DEFAULT_NOW_PLAYING_FEEDBACK_MODE,
             DEFAULT_PLAYBACK_VOLUME_PERCENT,
             DEFAULT_KEEP_PLAYING_IN_GAME_MENU,
@@ -41,7 +42,7 @@ public record CModConfig(
     public CModConfig withCheckForUpdates(boolean enabled) {
         return new CModConfig(
             enabled,
-            this.nowPlayingToastEnabled,
+            this.nowPlayingToastMode,
             this.nowPlayingFeedbackMode,
             this.playbackVolumePercent,
             this.keepPlayingInGameMenu,
@@ -49,10 +50,10 @@ public record CModConfig(
         );
     }
 
-    public CModConfig withNowPlayingToastEnabled(boolean enabled) {
+    public CModConfig withNowPlayingToastMode(CNowPlayingToastMode mode) {
         return new CModConfig(
             this.checkForUpdates,
-            enabled,
+            mode,
             this.nowPlayingFeedbackMode,
             this.playbackVolumePercent,
             this.keepPlayingInGameMenu,
@@ -63,7 +64,7 @@ public record CModConfig(
     public CModConfig withNowPlayingFeedbackMode(CNowPlayingFeedbackMode mode) {
         return new CModConfig(
             this.checkForUpdates,
-            this.nowPlayingToastEnabled,
+            this.nowPlayingToastMode,
             mode,
             this.playbackVolumePercent,
             this.keepPlayingInGameMenu,
@@ -74,7 +75,7 @@ public record CModConfig(
     public CModConfig withPlaybackVolumePercent(int playbackVolumePercent) {
         return new CModConfig(
             this.checkForUpdates,
-            this.nowPlayingToastEnabled,
+            this.nowPlayingToastMode,
             this.nowPlayingFeedbackMode,
             playbackVolumePercent,
             this.keepPlayingInGameMenu,
@@ -85,7 +86,7 @@ public record CModConfig(
     public CModConfig withKeepPlayingInGameMenu(boolean enabled) {
         return new CModConfig(
             this.checkForUpdates,
-            this.nowPlayingToastEnabled,
+            this.nowPlayingToastMode,
             this.nowPlayingFeedbackMode,
             this.playbackVolumePercent,
             enabled,
@@ -96,7 +97,7 @@ public record CModConfig(
     public CModConfig withDefaultTrackSource(CTrackSourceType sourceType) {
         return new CModConfig(
             this.checkForUpdates,
-            this.nowPlayingToastEnabled,
+            this.nowPlayingToastMode,
             this.nowPlayingFeedbackMode,
             this.playbackVolumePercent,
             this.keepPlayingInGameMenu,

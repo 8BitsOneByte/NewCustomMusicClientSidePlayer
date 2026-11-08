@@ -22,6 +22,7 @@ public final class CModConfigRepository {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String KEEP_PLAYING_IN_GAME_MENU_KEY = "keepPlayingInGameMenu";
     private static final String CHECK_FOR_UPDATES_KEY = "checkForUpdates";
+    private static final String NOW_PLAYING_TOAST_MODE_KEY = "nowPlayingToastMode";
     private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
     private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
     private static final String PLAYBACK_VOLUME_PERCENT_KEY = "playbackVolumePercent";
@@ -79,11 +80,7 @@ public final class CModConfigRepository {
 
         CModConfig config = new CModConfig(
             readBoolean(object, CHECK_FOR_UPDATES_KEY, CModConfig.DEFAULT_CHECK_FOR_UPDATES),
-            readBoolean(
-                object,
-                NOW_PLAYING_TOAST_ENABLED_KEY,
-                CModConfig.DEFAULT_NOW_PLAYING_TOAST_ENABLED
-            ),
+            readNowPlayingToastMode(object),
             readNowPlayingFeedbackMode(
                 object,
                 NOW_PLAYING_FEEDBACK_MODE_KEY,
@@ -142,7 +139,7 @@ public final class CModConfigRepository {
         JsonObject root = new JsonObject();
         root.addProperty(KEEP_PLAYING_IN_GAME_MENU_KEY, config.keepPlayingInGameMenu());
         root.addProperty(CHECK_FOR_UPDATES_KEY, config.checkForUpdates());
-        root.addProperty(NOW_PLAYING_TOAST_ENABLED_KEY, config.nowPlayingToastEnabled());
+        root.addProperty(NOW_PLAYING_TOAST_MODE_KEY, config.nowPlayingToastMode().name());
         root.addProperty(NOW_PLAYING_FEEDBACK_MODE_KEY, config.nowPlayingFeedbackMode().name());
         root.addProperty(PLAYBACK_VOLUME_PERCENT_KEY, config.playbackVolumePercent());
         root.addProperty(DEFAULT_TRACK_SOURCE_KEY, config.defaultTrackSource().name());
@@ -167,8 +164,9 @@ public final class CModConfigRepository {
             root.addProperty(CHECK_FOR_UPDATES_KEY, config.checkForUpdates());
             migrationNeeded = true;
         }
-        if (!root.has(NOW_PLAYING_TOAST_ENABLED_KEY)) {
-            root.addProperty(NOW_PLAYING_TOAST_ENABLED_KEY, config.nowPlayingToastEnabled());
+        if (!root.has(NOW_PLAYING_TOAST_MODE_KEY)) {
+            root.addProperty(NOW_PLAYING_TOAST_MODE_KEY, config.nowPlayingToastMode().name());
+            root.remove(NOW_PLAYING_TOAST_ENABLED_KEY);
             migrationNeeded = true;
         }
         if (!root.has(NOW_PLAYING_FEEDBACK_MODE_KEY)) {
@@ -257,6 +255,25 @@ public final class CModConfigRepository {
             }
             throw exception;
         }
+    }
+
+    private static CNowPlayingToastMode readNowPlayingToastMode(JsonObject object) {
+        if (object.has(NOW_PLAYING_TOAST_MODE_KEY)) {
+            CNowPlayingToastMode mode = parseNowPlayingToastMode(object.get(NOW_PLAYING_TOAST_MODE_KEY));
+            return mode == null ? CModConfig.DEFAULT_NOW_PLAYING_TOAST_MODE : mode;
+        }
+        return readBoolean(object, NOW_PLAYING_TOAST_ENABLED_KEY, true)
+            ? CNowPlayingToastMode.ON : CNowPlayingToastMode.OFF;
+    }
+
+    static CNowPlayingToastMode parseNowPlayingToastMode(JsonElement element) {
+        if (element instanceof JsonPrimitive primitive && primitive.isString()) {
+            try {
+                return CNowPlayingToastMode.valueOf(primitive.getAsString());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return null;
     }
 
     private static boolean readBoolean(JsonObject object, String key, boolean defaultValue) {

@@ -245,10 +245,15 @@ public final class CPlaylistTracksViewScreen extends Screen {
                 guiGraphics.blit(RenderPipelines.GUI_TEXTURED, icon, this.getContentX(), this.getContentY(), 0.0F, 0.0F, 32, 32, 32, 32);
 
                 int textX = this.getContentX() + 34;
-                guiGraphics.text(font, Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order", this.order, this.screen.getDisplayName(this.track)), textX, this.getContentY() + 1, CTrackSourcePresentation.nameColor(this.screen.sourceType, this.track), false);
+                boolean nameTooltip = CListNameRenderer.extract(guiGraphics, font,
+                    Component.translatable("screen.custommusicclientsideplayer.view_tracks.track_order",
+                        this.order, this.screen.getDisplayName(this.track)),
+                    CTrackSourcePresentation.nameColor(this.screen.sourceType, this.track),
+                    textX, this.getContentY() + 1, this.getContentRight(), this.screen.trackSelectionList,
+                    this.screen.trackSelectionList.scrollBarX(), mouseX, mouseY);
                 guiGraphics.text(font, CTrackSourcePresentation.description(this.screen.sourceType, this.track), textX, this.getContentY() + 12, 0xFF808080, false);
 
-                if (hovered) {
+                if (hovered && !nameTooltip) {
                     if (missingNamespace) {
                         guiGraphics.setTooltipForNextFrame(UNKNOWN_NAMESPACE_TOOLTIP, mouseX, mouseY);
                     } else if (unplayableTrack) {

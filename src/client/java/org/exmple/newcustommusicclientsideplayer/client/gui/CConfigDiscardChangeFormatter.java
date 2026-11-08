@@ -7,6 +7,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
+import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingToastMode;
 import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedbackMode;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 
@@ -45,11 +46,11 @@ public final class CConfigDiscardChangeFormatter {
                 CommonComponents.optionStatus(draft.checkForUpdates())
             ));
         }
-        if (applied.nowPlayingToastEnabled() != draft.nowPlayingToastEnabled()) {
+        if (applied.nowPlayingToastMode() != draft.nowPlayingToastMode()) {
             changes.add(change(
                 NOW_PLAYING_TOAST,
-                CommonComponents.optionStatus(applied.nowPlayingToastEnabled()),
-                CommonComponents.optionStatus(draft.nowPlayingToastEnabled())
+                toastModeLabel(applied.nowPlayingToastMode()),
+                toastModeLabel(draft.nowPlayingToastMode())
             ));
         }
         if (applied.nowPlayingFeedbackMode() != draft.nowPlayingFeedbackMode()) {
@@ -93,6 +94,16 @@ public final class CConfigDiscardChangeFormatter {
             appliedValue.copy().withStyle(ChatFormatting.GRAY),
             draftValue.copy().withStyle(ChatFormatting.YELLOW)
         ).withStyle(ChatFormatting.DARK_GRAY);
+    }
+
+    static Component toastModeLabel(CNowPlayingToastMode mode) {
+        return switch (mode) {
+            case ON -> CommonComponents.OPTION_ON;
+            case ON_PLUS -> Component.translatable(
+                "screen.custommusicclientsideplayer.mod_config.now_playing_toast.on_plus"
+            );
+            case OFF -> CommonComponents.OPTION_OFF;
+        };
     }
 
     private static Component feedbackModeLabel(CNowPlayingFeedbackMode mode) {

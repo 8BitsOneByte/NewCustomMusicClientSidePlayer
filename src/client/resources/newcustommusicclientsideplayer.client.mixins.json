@@ -11,6 +11,7 @@
     "ConnectScreenCancellationMixin",
     "MinecraftPauseSoundMixin",
     "MusicManagerMixin",
+    "PauseScreenMusicToastMixin",
     "SoundEngineAsyncPlaybackMixin",
     "SoundEngineAccessor",
     "SoundManagerAccessor"

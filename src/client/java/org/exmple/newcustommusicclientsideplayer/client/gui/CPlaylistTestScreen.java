@@ -13,6 +13,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ObjectSelectionList;
+import net.minecraft.client.gui.components.SelectableEntry;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -609,7 +610,7 @@ public class CPlaylistTestScreen extends Screen {
             }
         }
 
-        private static final class SoundEntry extends Entry {
+        private static final class SoundEntry extends Entry implements SelectableEntry {
             private final Font font;
             private final IdentifierSelectionList list;
             private final Identifier id;
@@ -633,11 +634,15 @@ public class CPlaylistTestScreen extends Screen {
                 guiGraphics.blit(RenderPipelines.GUI_TEXTURED, icon, this.getContentX(), this.getContentY(), 0.0F, 0.0F, 32, 32, 32, 32);
 
                 int textX = this.getContentX() + 34;
-                guiGraphics.text(this.font, CTrackSourcePresentation.highlight(fileName,
-                    this.list.playlistSide ? null : this.list.screen.searchPattern), textX, this.getContentY() + 1, CTrackSourcePresentation.nameColor(this.list.screen.sourceType, this.id), false);
+                boolean nameTooltip = CListNameRenderer.extract(guiGraphics, this.font,
+                    CTrackSourcePresentation.highlight(fileName,
+                        this.list.playlistSide ? null : this.list.screen.searchPattern),
+                    CTrackSourcePresentation.nameColor(this.list.screen.sourceType, this.id),
+                    textX, this.getContentY() + 1, this.getContentRight(), this.list,
+                    this.list.scrollBarX(), mouseX, mouseY);
                 guiGraphics.text(this.font, CTrackSourcePresentation.description(this.list.screen.sourceType, this.id), textX, this.getContentY() + 12, COLOR_TEXT_GRAY, false);
 
-                if (hovered) {
+                if (hovered && !nameTooltip) {
                     if (missingNamespace) {
                         guiGraphics.setTooltipForNextFrame(UNKNOWN_NAMESPACE_TOOLTIP, mouseX, mouseY);
                     } else if (unplayableTrack) {
@@ -720,22 +725,6 @@ public class CPlaylistTestScreen extends Screen {
                 }
 
                 return super.mouseClicked(mouseButtonEvent, bl);
-            }
-
-            private static boolean mouseOverIcon(int x, int y, int size) {
-                return x < size;
-            }
-
-            private static boolean mouseOverLeftHalf(int x, int y, int size) {
-                return x < size / 2;
-            }
-
-            private static boolean mouseOverTopRightQuarter(int x, int y, int size) {
-                return x > size / 2 && y < size / 2;
-            }
-
-            private static boolean mouseOverBottomRightQuarter(int x, int y, int size) {
-                return x > size / 2 && y > size / 2;
             }
         }
     }

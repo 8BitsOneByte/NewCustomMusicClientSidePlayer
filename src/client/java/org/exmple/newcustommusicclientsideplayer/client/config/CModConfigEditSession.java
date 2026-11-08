@@ -32,8 +32,8 @@ public final class CModConfigEditSession {
         this.draft = this.draft.withCheckForUpdates(enabled);
     }
 
-    public void setNowPlayingToastEnabled(boolean enabled) {
-        this.draft = this.draft.withNowPlayingToastEnabled(enabled);
+    public void setNowPlayingToastMode(CNowPlayingToastMode mode) {
+        this.draft = this.draft.withNowPlayingToastMode(mode);
     }
 
     public void setNowPlayingFeedbackMode(CNowPlayingFeedbackMode mode) {
