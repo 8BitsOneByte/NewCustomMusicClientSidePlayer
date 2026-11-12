@@ -531,3 +531,9 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 - On November 8, runClient --offline compiled and launched the Minecraft 26.3 development client successfully. In-game OGG-source checks covered playlist browsing, the single-track browser, View Playlist Tracks, playlist playback preview, and both editor columns. Eight F2 captures recorded clipped names, styled full-name tooltips, a fully visible short name without a tooltip, and editor lists with and without a visible scrollbar.
 - Imported 26 test playlists across both source groups and five custom-name mappings during the UI checks. After closing the client, restored the four JSON files and options.txt from their original byte backups and verified all five SHA-256 hashes.
 - Java syntax parsing completed for all 99 client source files with no diagnostics. Source review compared the editor with Minecraft 26.3 resource-pack controls and the playlist browser's bounded rectangles, and checked the icon's outer edges and half-icon boundaries; whitespace checks passed.
+
+## 1.5.2
+
+### Wiki
+
+- Updated the Wiki for 1.5.2, retaining the beta1 feature descriptions and adding a command tree checked against the registered client commands.
