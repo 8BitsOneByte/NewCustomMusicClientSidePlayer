@@ -537,3 +537,7 @@ This entry records maintenance completed during the `1.4.4-beta2` stabilization 
 ### Wiki
 
 - Updated the Wiki for 1.5.2, retaining the beta1 feature descriptions and adding a command tree checked against the registered client commands.
+
+### Modrinth project description
+
+- Expanded the Modrinth project description with vanilla audio, direct OGG playback, playlist management, and practical usage questions.
