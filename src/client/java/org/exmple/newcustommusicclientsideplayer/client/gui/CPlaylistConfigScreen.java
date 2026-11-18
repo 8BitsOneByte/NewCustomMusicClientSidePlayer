@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
+import java.util.regex.Pattern;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -35,6 +35,9 @@ import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistImportE
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistImportPreview;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistRepository;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistTransferService;
+
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistData;
 
 public class CPlaylistConfigScreen extends Screen {
     private static final Component TITLE = Component.translatable("screen.custommusicclientsideplayer.config_playlists.title");
@@ -95,12 +98,14 @@ public class CPlaylistConfigScreen extends Screen {
     private static final int MOVE_DOWN_MIN_Y = 20;
     private static final int MOVE_DOWN_MAX_Y_EXCLUSIVE = 27;
 
+    private final CTrackSourceType sourceType;
     private final Screen parent;
     private final CPlaylistTransferService transferService = new CPlaylistTransferService();
     private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this, 8 + 9 + 8 + 20 + 4, 60);
     private PlaylistSelectionList playlistSelectionList;
     private EditBox searchBox;
     private String filter = "";
+    private Pattern searchPattern;
 
     private Button importButton;
     private Button exportButton;
@@ -113,6 +118,7 @@ public class CPlaylistConfigScreen extends Screen {
 
     public CPlaylistConfigScreen(Screen parent) {
         super(TITLE);
+        this.sourceType = NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource();
         this.parent = parent;
     }
 
@@ -202,6 +208,7 @@ public class CPlaylistConfigScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.updateButtonStates();
         super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
+        CTrackSourcePresentation.header(guiGraphics, this.minecraft, this.sourceType);
         this.extractTransferButtonIcon(guiGraphics, this.importButton, IMPORT_ICON);
         this.extractTransferButtonIcon(guiGraphics, this.exportButton, EXPORT_ICON);
     }
@@ -213,7 +220,7 @@ public class CPlaylistConfigScreen extends Screen {
 
     private void reloadEntries() {
         try {
-            this.allSummaries = CPlaylistRepository.listPlaylistSummaries();
+            this.allSummaries = CPlaylistRepository.listPlaylistSummaries(this.sourceType);
             this.refreshVisibleEntries();
         } catch (IOException exception) {
             this.allSummaries = List.of();
@@ -229,10 +236,10 @@ public class CPlaylistConfigScreen extends Screen {
             return;
         }
 
-        String currentFilter = this.filter.toLowerCase(Locale.ROOT);
+        this.searchPattern = CTrackSourcePresentation.searchPattern(this.filter);
         List<CPlaylistRepository.PlaylistSummary> visible = this.allSummaries
             .stream()
-            .filter(summary -> currentFilter.isBlank() || summary.name().toLowerCase(Locale.ROOT).contains(currentFilter))
+            .filter(summary -> CTrackSourcePresentation.matches(this.searchPattern, summary.name()))
             .toList();
         this.playlistSelectionList.setEntries(visible);
         this.updateButtonStates();
@@ -409,6 +416,8 @@ public class CPlaylistConfigScreen extends Screen {
     private void openImportExceptionScreen(CPlaylistImportException exception) {
         switch (exception.reason()) {
             case IO_ERROR -> this.openImportMessageScreen(IMPORT_IO_ERROR_TITLE, IMPORT_IO_ERROR_BODY);
+            case UNSUPPORTED_VERSION -> this.openImportMessageScreen(IMPORT_INVALID_TITLE,
+                Component.translatable("screen.custommusicclientsideplayer.playlist_transfer.import_unsupported.body"));
             case INVALID_PLAYLIST_FILE -> this.openImportMessageScreen(IMPORT_INVALID_TITLE, IMPORT_INVALID_BODY);
             case NO_COMPATIBLE_PLAYLISTS -> this.openImportMessageScreen(
                 IMPORT_NO_COMPATIBLE_TITLE,
@@ -449,7 +458,13 @@ public class CPlaylistConfigScreen extends Screen {
                         this.minecraft.gui.setScreen(this);
                     }
                 }
-            ));
+            ) {
+                @Override
+                protected Component formatListItem(Component item) {
+                    return item.getString().isEmpty() || CPlaylistImportWarningFormatter.isSourceHeading(item)
+                        ? item : super.formatListItem(item);
+                }
+            });
         }
     }
 
@@ -512,7 +527,7 @@ public class CPlaylistConfigScreen extends Screen {
         String playlistName = selectedSummary.name();
         List<Identifier> playlist;
         try {
-            playlist = CPlaylistRepository.getPlaylist(playlistName);
+            playlist = CPlaylistRepository.getPlaylist(playlistName, this.sourceType).orElseThrow(() -> new IOException("Missing playlist")).tracks();
         } catch (IOException exception) {
             if (this.minecraft.player != null) {
                 this.minecraft.player.sendSystemMessage(Component.translatable("screen.custommusicclientsideplayer.error.read_playlist_failed"));
@@ -526,13 +541,14 @@ public class CPlaylistConfigScreen extends Screen {
                 this,
                 playlistName,
                 playlist,
-                (loop, shuffle, startIndex) -> this.playSelectedPlaylist(playlistName, playlist, loop, shuffle, startIndex)
+                (loop, shuffle, startIndex) -> this.playSelectedPlaylist(playlistName, playlist, loop, shuffle, startIndex),
+                this.sourceType
             )
         );
     }
 
     private int playSelectedPlaylist(String playlistName, List<Identifier> playlist, boolean loop, boolean shuffle, int startTrackIndex) {
-        return CPlaySoundController.playPlaylistFromUi(this.minecraft, playlistName, playlist, loop, shuffle, startTrackIndex - 1);
+        return CPlaySoundController.playPlaylistFromUi(this.minecraft, playlistName, playlist, loop, shuffle, startTrackIndex - 1, this.sourceType);
     }
 
     private void onEditSelected() {
@@ -544,7 +560,7 @@ public class CPlaylistConfigScreen extends Screen {
         String playlistName = selectedSummary.name();
         List<Identifier> initialPlaylist;
         try {
-            initialPlaylist = CPlaylistRepository.getPlaylist(playlistName);
+            initialPlaylist = CPlaylistRepository.getPlaylist(playlistName, this.sourceType).orElseThrow(() -> new IOException("Missing playlist")).tracks();
         } catch (IOException exception) {
             if (this.minecraft.player != null) {
                 this.minecraft.player.sendSystemMessage(Component.translatable("screen.custommusicclientsideplayer.error.open_playlist_failed"));
@@ -558,8 +574,9 @@ public class CPlaylistConfigScreen extends Screen {
                 this,
                 playlistName,
                 initialPlaylist,
-                updatedPlaylist -> CPlaylistRepository.savePlaylist(playlistName, updatedPlaylist),
-                this::reloadEntries
+                updatedPlaylist -> CPlaylistRepository.savePlaylist(playlistName, new CPlaylistData(this.sourceType, updatedPlaylist, System.currentTimeMillis())),
+                this::reloadEntries,
+                this.sourceType
             )
         );
     }
@@ -598,7 +615,7 @@ public class CPlaylistConfigScreen extends Screen {
 
     private void deleteSelectedPlaylist(String playlistName) {
         try {
-            boolean deleted = CPlaylistRepository.deletePlaylist(playlistName);
+            boolean deleted = CPlaylistRepository.deletePlaylist(playlistName, this.sourceType);
             if (!deleted) {
                 if (this.minecraft.player != null) {
                     this.minecraft.player.sendSystemMessage(Component.translatable("screen.custommusicclientsideplayer.error.playlist_not_found"));
@@ -622,7 +639,7 @@ public class CPlaylistConfigScreen extends Screen {
             return;
         }
 
-        this.minecraft.gui.setScreen(new CCreatePlaylistScreen(this, this::reloadEntries));
+        this.minecraft.gui.setScreen(new CCreatePlaylistScreen(this, this::reloadEntries, this.sourceType));
     }
 
     private void onRecreateSelected() {
@@ -658,7 +675,7 @@ public class CPlaylistConfigScreen extends Screen {
 
     private void recreateSelectedPlaylist(String playlistName) {
         try {
-            CPlaylistRepository.savePlaylist(playlistName, List.of());
+            CPlaylistRepository.savePlaylist(playlistName, new CPlaylistData(this.sourceType, List.of(), System.currentTimeMillis()));
         } catch (IOException exception) {
             if (this.minecraft.player != null) {
                 this.minecraft.player.sendSystemMessage(Component.translatable("screen.custommusicclientsideplayer.error.recreate_playlist_failed"));
@@ -673,7 +690,7 @@ public class CPlaylistConfigScreen extends Screen {
     private void openViewPlaylistTracks(String playlistName) {
         List<Identifier> tracks;
         try {
-            tracks = CPlaylistRepository.getPlaylist(playlistName);
+            tracks = CPlaylistRepository.getPlaylist(playlistName, this.sourceType).orElseThrow(() -> new IOException("Missing playlist")).tracks();
         } catch (IOException exception) {
             if (this.minecraft.player != null) {
                 this.minecraft.player.sendSystemMessage(Component.translatable("screen.custommusicclientsideplayer.error.open_playlist_tracks_failed"));
@@ -682,7 +699,7 @@ public class CPlaylistConfigScreen extends Screen {
             return;
         }
 
-        this.minecraft.gui.setScreen(new CPlaylistTracksViewScreen(this, playlistName, tracks));
+        this.minecraft.gui.setScreen(new CPlaylistTracksViewScreen(this, playlistName, tracks, this.sourceType));
     }
 
     private boolean canMovePlaylistUp(String playlistName) {
@@ -707,7 +724,7 @@ public class CPlaylistConfigScreen extends Screen {
 
     private void movePlaylist(String playlistName, int offset) {
         try {
-            boolean moved = CPlaylistRepository.movePlaylist(playlistName, offset);
+            boolean moved = CPlaylistRepository.movePlaylist(playlistName, offset, this.sourceType);
             if (!moved) {
                 return;
             }
@@ -819,7 +836,10 @@ public class CPlaylistConfigScreen extends Screen {
                 guiGraphics.blit(RenderPipelines.GUI_TEXTURED, LIST_ICON, this.getContentX(), this.getContentY(), 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
 
                 int textX = this.getContentX() + ICON_SIZE + 6;
-                guiGraphics.text(font, this.summary.name(), textX, this.getContentY() + 1, 0xFFFFFFFF, false);
+                CListNameRenderer.extract(guiGraphics, font,
+                    CTrackSourcePresentation.highlight(this.summary.name(), this.screen.searchPattern), 0xFFFFFFFF,
+                    textX, this.getContentY() + 1, this.getContentRight(), this.screen.playlistSelectionList,
+                    this.screen.playlistSelectionList.scrollBarX(), mouseX, mouseY);
                 guiGraphics.text(font, buildDescription(this.summary), textX, this.getContentY() + 12, 0xFF808080, false);
 
                 boolean showOverlay = !this.screen.minecraft.getLastInputType().isMouse() || hovered;

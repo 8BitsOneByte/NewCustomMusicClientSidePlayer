@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Objects;
 import net.fabricmc.loader.api.FabricLoader;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 
 public final class CModConfigTransferService {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -27,10 +28,13 @@ public final class CModConfigTransferService {
     private static final String MINECRAFT_MOD_ID = "minecraft";
     private static final String CONFIG_KEY = "config";
     private static final String MOD_ID_KEY = "modId";
+    private static final String KEEP_PLAYING_IN_GAME_MENU_KEY = "keepPlayingInGameMenu";
     private static final String CHECK_FOR_UPDATES_KEY = "checkForUpdates";
+    private static final String NOW_PLAYING_TOAST_MODE_KEY = "nowPlayingToastMode";
     private static final String NOW_PLAYING_TOAST_ENABLED_KEY = "nowPlayingToastEnabled";
     private static final String NOW_PLAYING_FEEDBACK_MODE_KEY = "nowPlayingFeedbackMode";
     private static final String PLAYBACK_VOLUME_PERCENT_KEY = "playbackVolumePercent";
+    private static final String DEFAULT_TRACK_SOURCE_KEY = "defaultTrackSource";
 
     public String defaultFileName() {
         return sanitizeFileName(modName()) + "-" + sanitizeFileName(modVersion()) + "-config.txt";
@@ -124,6 +128,15 @@ public final class CModConfigTransferService {
         // - known fields with the expected type are imported;
         // - known fields with any other JSON type are skipped and reported;
         // - unknown fields, including formatVersion metadata, are ignored.
+        if (configObject.has(KEEP_PLAYING_IN_GAME_MENU_KEY)) {
+            JsonElement element = configObject.get(KEEP_PLAYING_IN_GAME_MENU_KEY);
+            if (element instanceof JsonPrimitive primitive && primitive.isBoolean()) {
+                compatibleConfig = compatibleConfig.withKeepPlayingInGameMenu(primitive.getAsBoolean());
+                hasCompatibleSettings = true;
+            } else {
+                skippedFields.add(KEEP_PLAYING_IN_GAME_MENU_KEY);
+            }
+        }
         if (configObject.has(CHECK_FOR_UPDATES_KEY)) {
             JsonElement element = configObject.get(CHECK_FOR_UPDATES_KEY);
             if (element instanceof JsonPrimitive primitive && primitive.isBoolean()) {
@@ -133,10 +146,21 @@ public final class CModConfigTransferService {
                 skippedFields.add(CHECK_FOR_UPDATES_KEY);
             }
         }
-        if (configObject.has(NOW_PLAYING_TOAST_ENABLED_KEY)) {
+        if (configObject.has(NOW_PLAYING_TOAST_MODE_KEY)) {
+            CNowPlayingToastMode mode = CModConfigRepository.parseNowPlayingToastMode(
+                configObject.get(NOW_PLAYING_TOAST_MODE_KEY)
+            );
+            if (mode != null) {
+                compatibleConfig = compatibleConfig.withNowPlayingToastMode(mode);
+                hasCompatibleSettings = true;
+            } else {
+                skippedFields.add(NOW_PLAYING_TOAST_MODE_KEY);
+            }
+        } else if (configObject.has(NOW_PLAYING_TOAST_ENABLED_KEY)) {
             JsonElement element = configObject.get(NOW_PLAYING_TOAST_ENABLED_KEY);
             if (element instanceof JsonPrimitive primitive && primitive.isBoolean()) {
-                compatibleConfig = compatibleConfig.withNowPlayingToastEnabled(primitive.getAsBoolean());
+                compatibleConfig = compatibleConfig.withNowPlayingToastMode(primitive.getAsBoolean()
+                    ? CNowPlayingToastMode.ON : CNowPlayingToastMode.OFF);
                 hasCompatibleSettings = true;
             } else {
                 skippedFields.add(NOW_PLAYING_TOAST_ENABLED_KEY);
@@ -164,6 +188,16 @@ public final class CModConfigTransferService {
             }
         }
 
+        if (configObject.has(DEFAULT_TRACK_SOURCE_KEY)) {
+            CTrackSourceType sourceType = readDefaultTrackSource(configObject.get(DEFAULT_TRACK_SOURCE_KEY));
+            if (sourceType != null) {
+                compatibleConfig = compatibleConfig.withDefaultTrackSource(sourceType);
+                hasCompatibleSettings = true;
+            } else {
+                skippedFields.add(DEFAULT_TRACK_SOURCE_KEY);
+            }
+        }
+
         if (!hasCompatibleSettings) {
             throw CConfigImportException.noCompatibleSettings();
         }
@@ -179,6 +213,16 @@ public final class CModConfigTransferService {
         if (element instanceof JsonPrimitive primitive && primitive.isString()) {
             try {
                 return CNowPlayingFeedbackMode.valueOf(primitive.getAsString());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static CTrackSourceType readDefaultTrackSource(JsonElement element) {
+        if (element instanceof JsonPrimitive primitive && primitive.isString()) {
+            try {
+                return CTrackSourceType.valueOf(primitive.getAsString());
             } catch (IllegalArgumentException ignored) {
             }
         }

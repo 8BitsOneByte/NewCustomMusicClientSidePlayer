@@ -1,6 +1,7 @@
 package org.exmple.newcustommusicclientsideplayer.client.config;
 
 import java.util.Objects;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 
 public final class CModConfigEditSession {
     private CModConfig applied;
@@ -23,16 +24,24 @@ public final class CModConfigEditSession {
         return !this.draft.equals(this.applied);
     }
 
+    public void setKeepPlayingInGameMenu(boolean enabled) {
+        this.draft = this.draft.withKeepPlayingInGameMenu(enabled);
+    }
+
     public void setCheckForUpdates(boolean enabled) {
         this.draft = this.draft.withCheckForUpdates(enabled);
     }
 
-    public void setNowPlayingToastEnabled(boolean enabled) {
-        this.draft = this.draft.withNowPlayingToastEnabled(enabled);
+    public void setNowPlayingToastMode(CNowPlayingToastMode mode) {
+        this.draft = this.draft.withNowPlayingToastMode(mode);
     }
 
     public void setNowPlayingFeedbackMode(CNowPlayingFeedbackMode mode) {
         this.draft = this.draft.withNowPlayingFeedbackMode(mode);
+    }
+
+    public void setDefaultTrackSource(CTrackSourceType sourceType) {
+        this.draft = this.draft.withDefaultTrackSource(sourceType);
     }
 
     public void setPlaybackVolumePercent(int playbackVolumePercent) {

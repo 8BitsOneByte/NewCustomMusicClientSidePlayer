@@ -3,9 +3,8 @@ package org.exmple.newcustommusicclientsideplayer.client.gui;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
+import java.util.regex.Pattern;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.client.Minecraft;
@@ -14,6 +13,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ObjectSelectionList;
+import net.minecraft.client.gui.components.SelectableEntry;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -33,6 +33,9 @@ import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundContr
 import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistRepository;
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CPlaylistData;
 
 public class CPlaylistTestScreen extends Screen {
     private static final int LIST_WIDTH = 200;
@@ -57,6 +60,7 @@ public class CPlaylistTestScreen extends Screen {
     private static final Identifier MOVE_DOWN_HIGHLIGHTED_SPRITE = Identifier.withDefaultNamespace("transferable_list/move_down_highlighted");
     private static final Identifier MOVE_DOWN_SPRITE = Identifier.withDefaultNamespace("transferable_list/move_down");
 
+    private final CTrackSourceType sourceType;
     private final Screen parent;
     private final SaveAction saveAction;
     private final Runnable onSavedSuccess;
@@ -65,11 +69,13 @@ public class CPlaylistTestScreen extends Screen {
     private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this);
     private final CDropdownScreenCoordinator dropdownCoordinator =
         new CDropdownScreenCoordinator();
+    private Collection<Identifier> catalogResources;
     private List<Identifier> allSounds = List.of();
     private List<String> namespaces = List.of("minecraft");
     private final List<Identifier> playlist = new ArrayList<>();
     private int namespaceIndex = 0;
     private String availableFilter = "";
+    private Pattern searchPattern;
     private EditBox searchBox;
     private CDropdownSelector<String> namespaceSelector;
     private Button renamePlaylistButton;
@@ -92,7 +98,13 @@ public class CPlaylistTestScreen extends Screen {
     }
 
     public CPlaylistTestScreen(Screen parent, String playlistName, List<Identifier> initialPlaylist, SaveAction saveAction, Runnable onSavedSuccess) {
+        this(parent, playlistName, initialPlaylist, saveAction, onSavedSuccess,
+            NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource());
+    }
+
+    public CPlaylistTestScreen(Screen parent, String playlistName, List<Identifier> initialPlaylist, SaveAction saveAction, Runnable onSavedSuccess, CTrackSourceType sourceType) {
         super(Component.translatable("screen.custommusicclientsideplayer.playlist_editor.title"));
+        this.sourceType = sourceType;
         this.parent = parent;
         this.playlistName = playlistName;
         this.saveAction = saveAction;
@@ -182,6 +194,10 @@ public class CPlaylistTestScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        if (this.sourceType == CTrackSourceType.OGG_RESOURCE
+            && this.catalogResources != CTrackSourcePresentation.resources(this.minecraft, this.sourceType)) {
+            this.reloadLists();
+        }
         boolean mouseCoveredByDropdown =
             this.dropdownCoordinator.isMouseOverExpandedOverlay(mouseX, mouseY);
         super.extractRenderState(
@@ -190,6 +206,7 @@ public class CPlaylistTestScreen extends Screen {
             mouseCoveredByDropdown ? Integer.MIN_VALUE : mouseY,
             partialTick
         );
+        CTrackSourcePresentation.header(guiGraphics, this.minecraft, this.sourceType);
         this.dropdownCoordinator.extractOverlays(
             guiGraphics,
             mouseX,
@@ -296,7 +313,7 @@ public class CPlaylistTestScreen extends Screen {
             return;
         }
 
-        this.minecraft.gui.setScreen(new CRenamePlaylistScreen(this, this.playlistName, this::onRenameConfirmed));
+        this.minecraft.gui.setScreen(new CRenamePlaylistScreen(this, this.playlistName, this::onRenameConfirmed, this.sourceType));
     }
 
     private void onRenameConfirmed(String newPlaylistName) {
@@ -307,10 +324,7 @@ public class CPlaylistTestScreen extends Screen {
         List<Identifier> snapshot = List.copyOf(this.playlist);
         CompletableFuture.runAsync(() -> {
             try {
-                CPlaylistRepository.savePlaylist(newPlaylistName, snapshot);
-                if (!Objects.equals(newPlaylistName, this.playlistName)) {
-                    CPlaylistRepository.deletePlaylist(this.playlistName);
-                }
+                CPlaylistRepository.renamePlaylist(this.playlistName, newPlaylistName, new CPlaylistData(this.sourceType, snapshot, System.currentTimeMillis()));
             } catch (IOException exception) {
                 throw new RuntimeException(exception);
             }
@@ -337,9 +351,10 @@ public class CPlaylistTestScreen extends Screen {
             return;
         }
 
-        Collection<Identifier> all = this.minecraft.getSoundManager().getAvailableSounds();
+        Collection<Identifier> all = CTrackSourcePresentation.resources(this.minecraft, this.sourceType);
+        this.catalogResources = all;
         this.allSounds = all.stream()
-            .sorted(Comparator.comparing(Identifier::toString))
+            .sorted(CTrackSourcePresentation.order(this.sourceType))
             .toList();
         String previousNamespace = this.getCurrentNamespace();
         List<String> availableNamespaces = this.allSounds.stream()
@@ -373,13 +388,12 @@ public class CPlaylistTestScreen extends Screen {
 
         String namespace = this.getCurrentNamespace();
         this.availableSoundList.setTitle(Component.translatable("screen.custommusicclientsideplayer.playlist_editor.available_sounds_with_namespace", namespace));
-        String filter = this.availableFilter.toLowerCase(Locale.ROOT);
+        this.searchPattern = CTrackSourcePresentation.searchPattern(this.availableFilter);
         List<Identifier> available = this.allSounds.stream()
             .filter(id -> !this.playlist.contains(id))
             .filter(id -> id.getNamespace().equals(namespace))
-            .filter(id -> filter.isBlank()
-                || id.getPath().toLowerCase(Locale.ROOT).contains(filter)
-                || CTrackNameRepository.getDisplayName(id).toLowerCase(Locale.ROOT).contains(filter))
+            .filter(id -> CTrackSourcePresentation.matches(this.searchPattern, id.getPath())
+                || CTrackSourcePresentation.matches(this.searchPattern, CTrackNameRepository.getDisplayName(this.sourceType, id)))
             .toList();
         this.availableSoundList.setIdentifiers(available);
     }
@@ -464,8 +478,8 @@ public class CPlaylistTestScreen extends Screen {
         return idx >= 0 && idx < this.playlist.size() - 1;
     }
 
-    private static String getDisplayName(Identifier id) {
-        return CTrackNameRepository.getDisplayName(id);
+    private String getDisplayName(Identifier id) {
+        return CTrackNameRepository.getDisplayName(this.sourceType, id);
     }
 
     private static final class IdentifierSelectionList extends ObjectSelectionList<IdentifierSelectionList.Entry> {
@@ -596,7 +610,7 @@ public class CPlaylistTestScreen extends Screen {
             }
         }
 
-        private static final class SoundEntry extends Entry {
+        private static final class SoundEntry extends Entry implements SelectableEntry {
             private final Font font;
             private final IdentifierSelectionList list;
             private final Identifier id;
@@ -609,9 +623,9 @@ public class CPlaylistTestScreen extends Screen {
 
             @Override
             public void extractContent(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, boolean hovered, float delta) {
-                String fileName = CPlaylistTestScreen.getDisplayName(this.id);
+                String fileName = this.list.screen.getDisplayName(this.id);
                 boolean missingNamespace = this.list.playlistSide && this.list.screen.namespaces.stream().noneMatch(namespace -> namespace.equals(this.id.getNamespace()));
-                boolean unplayableTrack = this.list.playlistSide && !CPlaySoundController.isTrackPlayable(this.list.minecraft, this.id);
+                boolean unplayableTrack = this.list.playlistSide && !CPlaySoundController.isTrackPlayable(this.list.minecraft, this.id, this.list.screen.sourceType);
                 if (missingNamespace || unplayableTrack) {
                     guiGraphics.fill(this.getContentX() - 1, this.getContentY() - 1, this.getContentRight() + 1, this.getContentBottom() + 1, COLOR_INCOMPATIBLE_ROW);
                 }
@@ -620,10 +634,15 @@ public class CPlaylistTestScreen extends Screen {
                 guiGraphics.blit(RenderPipelines.GUI_TEXTURED, icon, this.getContentX(), this.getContentY(), 0.0F, 0.0F, 32, 32, 32, 32);
 
                 int textX = this.getContentX() + 34;
-                guiGraphics.text(this.font, fileName, textX, this.getContentY() + 1, COLOR_TEXT_WHITE, false);
-                guiGraphics.text(this.font, buildDescription(this.id), textX, this.getContentY() + 12, COLOR_TEXT_GRAY, false);
+                boolean nameTooltip = CListNameRenderer.extract(guiGraphics, this.font,
+                    CTrackSourcePresentation.highlight(fileName,
+                        this.list.playlistSide ? null : this.list.screen.searchPattern),
+                    CTrackSourcePresentation.nameColor(this.list.screen.sourceType, this.id),
+                    textX, this.getContentY() + 1, this.getContentRight(), this.list,
+                    this.list.scrollBarX(), mouseX, mouseY);
+                guiGraphics.text(this.font, CTrackSourcePresentation.description(this.list.screen.sourceType, this.id), textX, this.getContentY() + 12, COLOR_TEXT_GRAY, false);
 
-                if (hovered) {
+                if (hovered && !nameTooltip) {
                     if (missingNamespace) {
                         guiGraphics.setTooltipForNextFrame(UNKNOWN_NAMESPACE_TOOLTIP, mouseX, mouseY);
                     } else if (unplayableTrack) {
@@ -674,10 +693,6 @@ public class CPlaylistTestScreen extends Screen {
                 return Component.literal(this.id.toString());
             }
 
-            private static Component buildDescription(Identifier id) {
-                return Component.translatable("screen.custommusicclientsideplayer.common.music_files_from", Component.literal(id.getNamespace()).withStyle(style -> style.withBold(true)));
-            }
-
             @Override
             public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
                 int localX = (int)mouseButtonEvent.x() - this.getContentX();
@@ -710,22 +725,6 @@ public class CPlaylistTestScreen extends Screen {
                 }
 
                 return super.mouseClicked(mouseButtonEvent, bl);
-            }
-
-            private static boolean mouseOverIcon(int x, int y, int size) {
-                return x < size;
-            }
-
-            private static boolean mouseOverLeftHalf(int x, int y, int size) {
-                return x < size / 2;
-            }
-
-            private static boolean mouseOverTopRightQuarter(int x, int y, int size) {
-                return x > size / 2 && y < size / 2;
-            }
-
-            private static boolean mouseOverBottomRightQuarter(int x, int y, int size) {
-                return x > size / 2 && y > size / 2;
             }
         }
     }

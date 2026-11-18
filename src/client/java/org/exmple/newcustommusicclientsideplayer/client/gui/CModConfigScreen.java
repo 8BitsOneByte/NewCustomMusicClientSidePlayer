@@ -25,14 +25,20 @@ import org.exmple.newcustommusicclientsideplayer.client.bootstrap.Newcustommusic
 import org.exmple.newcustommusicclientsideplayer.client.config.CConfigImportException;
 import org.exmple.newcustommusicclientsideplayer.client.config.CConfigImportPreview;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
+import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingToastMode;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigEditSession;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigRepository;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigTransferService;
 import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingFeedbackMode;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
 
 public final class CModConfigScreen extends Screen {
     private static final Component TITLE =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.title");
+    private static final Component KEEP_PLAYING_IN_GAME_MENU =
+        Component.translatable("screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu");
+    private static final Component KEEP_PLAYING_IN_GAME_MENU_TOOLTIP =
+        Component.translatable("screen.custommusicclientsideplayer.mod_config.keep_playing_in_game_menu.tooltip");
     private static final Component CHECK_FOR_UPDATES =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.check_for_updates");
     private static final Component NOW_PLAYING_TOAST =
@@ -41,6 +47,15 @@ public final class CModConfigScreen extends Screen {
         Component.translatable("screen.custommusicclientsideplayer.mod_config.now_playing_feedback");
     private static final String PLAYBACK_VOLUME_KEY =
         "screen.custommusicclientsideplayer.mod_config.playback_volume";
+    private static final Component TRACK_SOURCE =
+        Component.translatable("screen.custommusicclientsideplayer.mod_config.track_source");
+    private static final Component TRACK_SOURCE_TOOLTIP = Component.translatable(
+        "screen.custommusicclientsideplayer.mod_config.track_source.tooltip",
+        CConfigDiscardChangeFormatter.trackSourceLabel(CTrackSourceType.SOUND_EVENT).copy()
+            .withStyle(ChatFormatting.GREEN),
+        CConfigDiscardChangeFormatter.trackSourceLabel(CTrackSourceType.OGG_RESOURCE).copy()
+            .withStyle(ChatFormatting.GOLD)
+    );
     private static final Component APPLY =
         Component.translatable("screen.custommusicclientsideplayer.mod_config.apply");
     private static final Component IMPORT_CONFIG =
@@ -127,8 +142,10 @@ public final class CModConfigScreen extends Screen {
         new HeaderAndFooterLayout(this, HEADER_HEIGHT, FOOTER_HEIGHT);
 
     private StringWidget saveErrorWidget;
+    private CycleButton<Boolean> keepPlayingInGameMenuButton;
+    private CycleButton<CTrackSourceType> trackSourceButton;
     private CycleButton<Boolean> checkForUpdatesButton;
-    private CycleButton<Boolean> nowPlayingToastButton;
+    private CycleButton<CNowPlayingToastMode> nowPlayingToastButton;
     private CycleButton<CNowPlayingFeedbackMode> nowPlayingFeedbackButton;
     private AbstractWidget playbackVolumeSlider;
     private Button importButton;
@@ -180,11 +197,19 @@ public final class CModConfigScreen extends Screen {
                 )
         );
         this.nowPlayingToastButton = rows.addChild(
-            CycleButton.onOffBuilder(this.editSession.draft().nowPlayingToastEnabled())
+            CycleButton.<CNowPlayingToastMode>builder(
+                    CConfigDiscardChangeFormatter::toastModeLabel,
+                    this.editSession.draft().nowPlayingToastMode()
+                )
+                .withValues(CNowPlayingToastMode.values())
+                .withTooltip(mode -> mode == CNowPlayingToastMode.OFF ? null : Tooltip.create(
+                    Component.translatable("screen.custommusicclientsideplayer.mod_config.now_playing_toast."
+                        + (mode == CNowPlayingToastMode.ON ? "on_tooltip" : "on_plus_tooltip"))
+                ))
                 .create(
                     NOW_PLAYING_TOAST,
-                    (button, enabled) -> {
-                        this.editSession.setNowPlayingToastEnabled(enabled);
+                    (button, mode) -> {
+                        this.editSession.setNowPlayingToastMode(mode);
                         this.clearSaveError();
                         this.updateButtonStates();
                     }
@@ -217,6 +242,28 @@ public final class CModConfigScreen extends Screen {
                     this.updateButtonStates();
                 }
             )
+        );
+        this.keepPlayingInGameMenuButton = rows.addChild(
+            CycleButton.onOffBuilder(this.editSession.draft().keepPlayingInGameMenu())
+                .withTooltip(enabled -> Tooltip.create(KEEP_PLAYING_IN_GAME_MENU_TOOLTIP))
+                .create(0, 0, OPTION_WIDTH, 20, KEEP_PLAYING_IN_GAME_MENU, (button, enabled) -> {
+                    this.editSession.setKeepPlayingInGameMenu(enabled);
+                    this.clearSaveError();
+                    this.updateButtonStates();
+                })
+        );
+        this.trackSourceButton = rows.addChild(
+            CycleButton.<CTrackSourceType>builder(
+                    CConfigDiscardChangeFormatter::trackSourceLabel,
+                    this.editSession.draft().defaultTrackSource()
+                )
+                .withValues(CTrackSourceType.values())
+                .withTooltip(sourceType -> Tooltip.create(TRACK_SOURCE_TOOLTIP))
+                .create(0, 0, OPTION_WIDTH, 20, TRACK_SOURCE, (button, sourceType) -> {
+                    this.editSession.setDefaultTrackSource(sourceType);
+                    this.clearSaveError();
+                    this.updateButtonStates();
+                })
         );
         this.saveErrorWidget = rows.addChild(
             new StringWidget(CONTENT_WIDTH, this.font.lineHeight, Component.empty(), this.font),
@@ -588,11 +635,17 @@ public final class CModConfigScreen extends Screen {
     }
 
     private void syncOptionWidgets() {
+        if (this.trackSourceButton != null) {
+            this.trackSourceButton.setValue(this.editSession.draft().defaultTrackSource());
+        }
+        if (this.keepPlayingInGameMenuButton != null) {
+            this.keepPlayingInGameMenuButton.setValue(this.editSession.draft().keepPlayingInGameMenu());
+        }
         if (this.checkForUpdatesButton != null) {
             this.checkForUpdatesButton.setValue(this.editSession.draft().checkForUpdates());
         }
         if (this.nowPlayingToastButton != null) {
-            this.nowPlayingToastButton.setValue(this.editSession.draft().nowPlayingToastEnabled());
+            this.nowPlayingToastButton.setValue(this.editSession.draft().nowPlayingToastMode());
         }
         if (this.nowPlayingFeedbackButton != null) {
             this.nowPlayingFeedbackButton.setValue(this.editSession.draft().nowPlayingFeedbackMode());
@@ -609,8 +662,10 @@ public final class CModConfigScreen extends Screen {
 
     private static Component skippedFieldLabel(String field) {
         return switch (field) {
+            case "defaultTrackSource" -> TRACK_SOURCE;
+            case "keepPlayingInGameMenu" -> KEEP_PLAYING_IN_GAME_MENU;
             case "checkForUpdates" -> CHECK_FOR_UPDATES;
-            case "nowPlayingToastEnabled" -> NOW_PLAYING_TOAST;
+            case "nowPlayingToastEnabled", "nowPlayingToastMode" -> NOW_PLAYING_TOAST;
             case "nowPlayingFeedbackMode" -> NOW_PLAYING_FEEDBACK;
             case "playbackVolumePercent" -> Component.translatable(PLAYBACK_VOLUME_KEY);
             default -> Component.literal(field);

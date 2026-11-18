@@ -7,6 +7,19 @@ import java.util.Objects;
 import net.minecraft.resources.Identifier;
 
 public final class CTrackNameImportPreview {
+    private Map<CTrackSourceType, CTrackNameImportPreview> groups = Map.of();
+    private List<String> unknownGroups = List.of();
+
+    public static CTrackNameImportPreview grouped(Map<CTrackSourceType, CTrackNameImportPreview> groups, List<String> unknown) {
+        CTrackNameImportPreview result = new CTrackNameImportPreview(Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        result.groups = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(groups));
+        result.unknownGroups = List.copyOf(unknown);
+        return result;
+    }
+
+    public Map<CTrackSourceType, CTrackNameImportPreview> groups() { return groups; }
+    public List<String> unknownGroups() { return unknownGroups; }
+
     private final LinkedHashMap<Identifier, String> compatibleNames;
     private final List<String> invalidTrackIds;
     private final List<Identifier> duplicateTrackIds;
@@ -44,7 +57,7 @@ public final class CTrackNameImportPreview {
     }
 
     public boolean hasCompatibleNames() {
-        return !this.compatibleNames.isEmpty();
+        return !this.compatibleNames.isEmpty() || groups.values().stream().anyMatch(CTrackNameImportPreview::hasCompatibleNames);
     }
 
     public List<String> invalidTrackIds() {
@@ -80,7 +93,7 @@ public final class CTrackNameImportPreview {
     }
 
     public boolean hasWarnings() {
-        return !this.invalidTrackIds.isEmpty()
+        return !unknownGroups.isEmpty() || groups.values().stream().anyMatch(CTrackNameImportPreview::hasWarnings) || !this.invalidTrackIds.isEmpty()
             || !this.duplicateTrackIds.isEmpty()
             || !this.nonStringNameTrackIds.isEmpty()
             || !this.emptyNameTrackIds.isEmpty()

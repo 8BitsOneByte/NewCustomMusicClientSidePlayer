@@ -32,6 +32,10 @@ public final class CPlaylistImportException extends Exception {
         return new CPlaylistImportException(Reason.NO_COMPATIBLE_PLAYLISTS);
     }
 
+    public static CPlaylistImportException unsupportedVersion() {
+        return new CPlaylistImportException(Reason.UNSUPPORTED_VERSION);
+    }
+
     public Reason reason() {
         return this.reason;
     }
@@ -49,6 +53,7 @@ public final class CPlaylistImportException extends Exception {
          * playlists node.
          */
         INVALID_PLAYLIST_FILE,
+        UNSUPPORTED_VERSION,
 
         /**
          * The file is a valid playlist export, but none of its playlists can be imported by this

@@ -163,3 +163,133 @@ This entry records small, low-risk maintenance completed while `1.4.4-beta2` rem
 - The playback controller retains its independent empty, availability, queue-position, and final-start checks as defense for unexpected callers or state changes. Under ordinary GUI interaction the screen validation prevents these failure paths, while the controller remains able to reject an invalid request safely if the UI is bypassed.
 - Command-based playlist playback retains its chat error feedback. All command paths that report the no-playable-sound condition now apply explicit red styling, while the corresponding disabled-button tooltips remain the normal white tooltip color.
 - Added reviewed English and Simplified Chinese text for the non-loop starting-position condition. This change does not modify playlist storage, track ordering, import/export formats, configuration data, or the playback queue's established filtering behavior.
+
+## Minecraft 26.2 backport — Part 1
+
+- Begin backport preparation for Minecraft 26.2 as Minecraft 26.4 approaches and the release timing of 1.5.3 remains uncertain.
+
+### Isolated development environment
+
+- Configure a dedicated Minecraft 26.2 development instance with Java 25, an external game directory, and separate build outputs and project caches.
+- Enable the unobfuscated Minecraft mode for Loom 1.15.5 and resolve the Fabric dependencies required by the client runtime.
+- Defer run-task validation until execution so IntelliJ's coroutine debugging initialization can resolve the client classpath within Gradle's task configuration context.
+- Pass the game directory to Loom as a project-relative path, preventing Windows drive paths from being appended to the project directory twice.
+- Reproduce the IntelliJ initialization failure with its debugger scripts, then verify successful task-graph preparation after the adjustment.
+- Launch Minecraft 26.2 with Fabric Loader 0.19.3 and mod version 1.4.5-beta1 in the isolated instance; resource loading and sound-engine startup complete, and the client reaches the interactive main menu.
+
+## 1.4.5-beta1 — Minecraft 26.2 backport
+
+### Playback foundation
+
+- Backported the 1.5.2 playback, storage, and interface behavior to Minecraft 26.2. Mod and transfer metadata identify this version as `1.4.5-beta1`.
+- Added per-instance filtering to the global resume path. It skips manually paused mod-owned channels and cancelled handles in the captured handle set, and resumes eligible vanilla channels when containers, inventory, chat, or configuration screens close.
+- Pause and resume operations publish the instance's playback intent before queuing a native operation. The sound executor reads that intent when executing the task; explicit manual pause queues the native pause operation.
+- Added logical manual-pause state covering loading, prepared, playing, and paused channels. Audio prepared during manual pause attaches to its channel and waits for explicit continuation.
+- Continuation resumes an already-started paused channel from its current position, starts a prepared initial channel, or permits a loading channel to start after preparation. Repeated resume requests continue the current position.
+- Cancelled instances enter a terminal state. Late static-buffer results are discarded; late streamed results are closed on the sound executor before attachment. Channel release owns cleanup of attached streams, while shared static buffers retain their shared lifecycle.
+- Starting a replacement track or a new single-track or playlist session clears manual pause. Stopping a session clears the controller's pause state immediately.
+- Recover ended instances before the paused-session early return. If a paused session loses its current channel after a sound-engine or output-device reload, clear the session and its vanilla-music suppression instead of advancing the paused playlist.
+- Replaced the world-change shortcut that skipped global sound cleanup. Retain the exact current music instance and its active, uncancelled channel handle, then clean up the other sounds; use the original full-stop operation when the retained pair is unavailable.
+- Publish cancellation before removing discarded handles from engine indexes. Clear their instance mappings, source entries, delayed playback, deletion deadlines, tickable queues, and cached source gains.
+- Sweep the actual handle set on the sound executor, retaining the selected handle and releasing every other handle, including handles absent from engine indexes. Remove a handle from the set before releasing it to share cleanup ownership with queued cancellation.
+- Apply selective cleanup to departing-world sounds such as elytra wind, ambience, minecart loops, and entity-bound sounds, including their scheduled restarts. Playing, paused, and loading mod music keeps its channel, position, and pause intent.
+- Stop local jukebox sounds on world departure and follow vanilla jukebox playback events on re-entry.
+- Added **Keep Playing in Game Menu**, defaulting to OFF. ON retains the current music instance, playback position, pause intent, and playlist queue when leaving a world; OFF stops owned sounds and clears the session.
+- Apply the disconnect decision synchronously at teardown, covering pause-menu exits, low-level connection closure, kicks, and connection loss. Reconfiguration and server-directed transfer retain the session while moving to the destination.
+- Scope temporary server-transfer disconnect handling around the screen display operation and release it in a `finally` block. Distinguish destination preparation with an empty world from an ended connection.
+- Address-resolution failures, login failures, and explicit connection cancellation apply the menu setting. Transition paths where vanilla skips sound stopping still perform selective cleanup.
+- In menus, recover retired sounds and release finished instances. A retained playlist waits for world entry before advancing; finishing the last track of a non-looping playlist clears that session on the next client tick. Valid paused instances retain their pause intent.
+- Replaced the MUSIC-category volume lock with suppression of the vanilla music manager's scheduled tick and direct start operation. A current managed track or active playlist session keeps suppression active during playback, manual pause, and menu waiting.
+- Publish the new managed instance before stopping vanilla music and submitting audio loading. Cancel the vanilla manager's current channel before stopping it so late audio preparation cannot restart it, then request release of the cancelled handle.
+- Use vanilla stopping to clear its tracked instance, dismiss its music toast, and reset its scheduling delay. Once the custom session ends, ordinary scheduling resumes with the configured MUSIC volume intact.
+- Managed playback uses MASTER combined with the mod's independent playback-volume percentage. The Java runtime dependency now explicitly requires Java 25 or newer.
+
+### Storage, resource sources, and commands
+
+- Applied mandatory atomic replacement to playlist, configuration, and custom-name saves: write complete UTF-8 JSON to a unique temporary file in the destination directory and publish it with an atomic move.
+- Unsupported atomic replacement or a failed move reports a save failure and preserves the previous destination. Attempt to remove the temporary file after a failed save; configuration saves attach cleanup failures to the primary exception.
+- Configuration Apply retains the draft and latest applied baseline when persistence fails. Custom-name edits publish their in-memory result after successful storage.
+- Added an in-memory catalog of effective `sounds/**/*.ogg` resources from vanilla assets and enabled resource packs, including files without a registered sound event. Each entry retains its complete resource ID, namespace, and supplying pack ID.
+- Resource-manager priority resolves identical IDs before indexing. Reload publishes a complete new directory during apply, with metadata initially pending; resource collections belong to one generation.
+- Parse metadata on one daemon worker, retaining at most one active job and the latest pending job. Replace superseded pending work rather than accumulating requests.
+- Read Ogg pages incrementally, checking capture patterns, version, flags, sequence, continuation, checksums, and granule progression. Identify Vorbis headers, sample rate, and channel count, and derive duration from final sample count without PCM decoding.
+- Explicit parser buffers total 328,505 bytes under a 1 MiB working-buffer limit. Record `PENDING`, `READY`, `INVALID`, `UNSUPPORTED`, or `IO_ERROR` per resource; unsupported chained or multiplexed layouts and individual file failures do not stop the remaining scan.
+- Reparse metadata after reload, reuse immutable identifiers where possible, and cancel obsolete generations. Close resource streams after success, failure, or cancellation, and discard results from obsolete jobs.
+- Failed reload and client shutdown cancel their metadata work; shutdown also closes the catalog and worker. Playback opens separate streams, and catalog storage remains in memory.
+- Local playlist storage and exports use **format version 3**, grouping playlists by `SOUND_EVENT` and `OGG_RESOURCE`. Names and ordering are independent and case-sensitive within each source; each list retains its source, ordered tracks, and modification time.
+- Accept legacy version 1 and version 2 playlists and migrate them into source groups. Legacy arrays and objects become sound-event lists; version 2 entries use their explicit source. Missing local times fall back to the nonnegative source-file modification time.
+- Preserve original bytes before migration: version 1 uses `playlists.json.migrated`, and version 2 uses `playlists.json.v2.migrated`. Reuse an identical archive; a conflicting archive rejects migration before replacing the stored document.
+- Preserve unknown root members, unknown source groups, unreadable entries, and unedited object members. Legacy entries with unknown sources remain in `UNKNOWN_LEGACY`; exports carry retained raw data.
+- Keep readable lists usable when other entries cannot be interpreted. Unreadable names remain occupied and cannot be edited through the typed API; whole-document read failures block ordinary storage operations instead of exposing empty replaceable data.
+- Rename preserves list order and checks the destination name in one storage operation. Import rechecks all destination names and publishes one merged batch, protecting names created after the preview.
+- Compare the source file with the originally read bytes before replacement; external edits or deletion reject the save. Migration repeats this comparison after archiving and before publication.
+- Playlist import accepts legacy, version 2, and version 3 transfers. Unsupported future versions, invalid version values, and repeated `formatVersion` declarations reject the file.
+- Skip lists with unusable names or unknown sources while retaining compatible lists. Trim names, enforce the 50-character limit, and resolve exact collisions within each source with `(2)`, `(3)`, and later available suffixes, shortening the base when required.
+- Validate track identifiers and their source-specific shape. OGG IDs include `sounds/` and `.ogg`; valid IDs remain importable when their resource pack or event is currently absent. Invalid tracks are removed with preview details while valid order is retained.
+- Empty playlists remain importable. Missing `tracks` gives an empty list; a non-array value adds the unreadable-track-list warning. Filtering all invalid tracks still leaves an importable empty list.
+- Missing or invalid imported modification times use zero and retain the warning. Nonnegative future timestamps remain supported. An import with no compatible lists opens the existing no-compatible-playlists error.
+- Preserve the streaming reader's handling of repeated top-level `playlists` and `modId`: later readable values replace earlier readable values, and wrong-type values are skipped. Repeated list names enter source-specific collision handling.
+- Group recoverable warnings with Ogg Files before Sound Events, using gold and green source labels. Display only source sections with warnings; compatible clean-source lists remain part of the same import.
+- Keep skipped-list counts above source sections and preserve unreadable-track, invalid-ID, empty-ID, invalid-time, and renamed-list details. Short warnings use the compact panel and long warnings use the scrollable presentation.
+- Unsupported future or repeated versions use the version-specific error body under the existing invalid-file title. Resource availability and metadata readiness do not add import warning categories.
+- Custom-name storage and exports use **format version 2**, with separate `SOUND_EVENT` and `OGG_RESOURCE` maps in `track_names.json`. The same resource ID can have independent names in both sources.
+- Migrate valid unversioned and version 1 local names into the event group, preserving root data and archiving original bytes in `track_names.json.migrated` before atomic publication.
+- Invalid legacy names, conflicting migration archives, unsupported local versions, and load failures protect the existing file from replacement. A readable source group remains editable when another known group is unreadable; writes carry other raw data forward.
+- Name lookup, rename, restoration, and batch import use the selected source. Older external flat exports become sound-event mappings without modifying the selected external file.
+- Retain name validation for non-text, empty, overlong, redundant-default, duplicate-ID, same-namespace conflicts, and replacements. Trim imported names; IDs repeated within one source are all skipped, while the same ID in different sources remains independent.
+- Import known name groups as one batch. A validation or save failure prevents partial publication, identical mappings avoid another save, and comparison with original bytes rejects detected external changes.
+- Skip unknown groups in external name imports while preserving unknown groups already stored locally. A malformed known group, repeated group declaration, or unsupported version rejects the external file.
+- Group name warnings by OGG then sound events, list unknown groups above those sections, and retain the existing no-compatible-names flow. Cancel and Esc leave stored mappings unchanged.
+- Added the preferred track-source setting. New installations default to OGG; existing configurations with a missing or invalid choice retain sound events. A valid stored choice takes priority.
+- Before initialization, inspect playlist, name, legacy volume, and corresponding migration files for existing-data evidence. Existing or not-confirmed-absent paths select sound events; unreadable or non-object configuration also uses compatible sound-event defaults.
+- Include source and menu-continuation settings in persistence, missing-field repair, draft comparison, import, export, Apply, reset, discard details, and widget synchronization. Missing or invalid imported fields retain their draft values.
+- Added `/tracksource` query and `sound_events` / `ogg_files` selection with completion. Save a changed preference before applying it; selecting the current value reports that it is already active.
+- Adapted single-track and playlist commands to source-specific identifiers, playlist lookup, and completion. Direct OGG playback resolves the exact file and streams it through the managed instance.
+- Each playback session captures its source. Later preference changes affect subsequent sessions; pause, resume, stop, looping, relative skips, random skips, and shuffle use the captured queue and source.
+
+### Browsing, editing, and playback presentation
+
+- Single-track and playlist screens capture the applied source on opening. Carry it through selection, renaming, restoration, viewing, editing, playback preview, and playback confirmation.
+- Sound-event mode lists registered events; OGG mode lists effective catalog resources. Both use the existing namespace selector, sorted namespace options, search field, and controls.
+- Display a two-line source indicator at the upper left: a white heading followed by Sound Events in green or Ogg Files in gold. Row descriptions identify a sound event or music file and retain the namespace argument.
+- Generate OGG default names from the final filename without `.ogg`. Detect filename conflicts within a namespace using the complete effective catalog, independently of search and custom names.
+- Ambiguous filenames display their full path including `sounds/` and `.ogg`. Identical resource IDs overridden by packs contribute one effective entry; different namespaces do not expand each other's names.
+- Sort OGG resources by filename, then nearest parent directory and successive parents. Shorter matching suffix paths come first, with namespace as the final comparison.
+- After catalog replacement, refresh open browsers and available editor resources. Preserve the selected namespace when available and otherwise select the first; retain saved playlist order.
+- Renaming changes the source-specific display-name mapping. **Restore Default Name** removes that mapping and regenerates the current catalog label without saving it as a custom name or applying custom-name length and conflict validation.
+- Display custom track names in yellow in the single-track browser, editor, playback preview, and View Playlist Tracks. The single-track row number also remains yellow; default names use white.
+- Highlight visible search matches in green, including overlapping occurrences. Searches are case-insensitive, Unicode-aware, and literal, so punctuation does not become a regular-expression operator.
+- Search original resource paths and current source-specific names. Hidden-path-only matches keep the displayed custom name and its ordinary color; no hidden path is added to the row. Row numbers remain outside highlighted text.
+- Apply the same matching to playlist names and the editor's available tracks. Green takes precedence inside custom names, and empty or whitespace-only queries show the ordinary list.
+- Clip overflowing names at the row's visible boundary in the playlist browser, single-track browser, track view, playback preview, and both editor columns. Intersect the row with the list viewport and screen, and stop at an overlapping visible scrollbar.
+- Display a complete-name tooltip only over clipped visible text. Preserve search and custom-name styling; on the name line, the full-name tooltip takes precedence over unavailable-track warnings.
+- Use the same bounded 32-by-32 icon regions for playlist-editor hover and click handling, including half-icon controls. Clicking track names or descriptions no longer activates add, remove, or reorder actions.
+- Replace the toast toggle with ON, ON++, and OFF. ON shows the temporary song-start toast; ON++ additionally displays the current track at the upper right of the pause menu, with the existing English and Chinese mode tooltips.
+- Read the title from the active instance and captured source. Update it when tracks change, hide it during custom pause, and clear it after stopping, finishing, or channel invalidation. Resume restores the pause-menu display without a new temporary toast.
+- Reuse the temporary toast on track changes, refreshing its title and duration. The pause-menu card appears immediately and replaces the temporary card while ON++ is shown there; both retain the 200-pixel width limit and ellipsis.
+- Store `nowPlayingToastMode`; migrate the old boolean and old configuration imports to ON or OFF. Export the selected mode and retain the draft on invalid imported values.
+- All six settings participate in draft editing, dirty detection, applied-to-draft discard details, defaults, imports, and widget synchronization. Keep Editing preserves the draft; successful Apply establishes the baseline restored by later discard.
+- Use Minecraft 26.2's fullscreen and link APIs, rendering pipeline, direct-sound resolution, and native file dialogs while retaining source-specific screen and transfer behavior.
+
+### Verification on Minecraft 26.2
+
+- A non-clean build passed with Java 25.0.2, Minecraft 26.2, Fabric Loader 0.19.3, and Fabric API `0.152.1+26.2`.
+- The independent 26.2 development client loaded `1.4.5-beta1`, reached the main menu, initialized its sound engine, and entered a test world.
+- The configuration, playlist-storage, custom-name, and discard-formatter harnesses passed 155 checks: 62 configuration checks, 21 playlist-storage checks, 32 custom-name checks, and 40 formatter checks.
+- In-game configuration testing imported changes to all six fields, opened six applied-to-draft details through Esc, kept the draft, and applied it successfully.
+- Resetting after Apply produced six reverse changes through Back. Explicit discard and reopening restored all six values to the latest applied baseline.
+- Imported two playlists with the same name in different source groups and started playback from the sound-event playlist.
+- Source comparison covered all 113 files under `src`, including added files. The seven substantive differences from the 1.5.2 reference are Minecraft 26.2 platform adaptations; both bundled language files and other resources match the reference.
+- Direct OGG browsing filtered by resource path and started a selected vanilla music file. ON++ displayed its title in the pause menu, hid it after manual pause, and restored it after resume.
+- Before a subsequent build, the isolated Gradle initialization archived the existing versioned jar and sources jar and verified both SHA-256 hashes; successful builds also completed the existing post-build archive.
+- Reimporting same-name lists displayed separate OGG and sound-event rename warnings, then preserved both source groups. The OGG editor retained its two tracks when the track-name area was clicked; its playback preview used the corresponding file names.
+- Started an OGG playlist and used `/skip` to advance from `beginning_2` to `floating_trees`. With menu continuation enabled, leaving and re-entering the test world retained the active single-track session.
+- Reloading resources during playback completed resource and sound-engine initialization, returned to the world, and cleared the inactive track from the pause-menu display.
+- Started `xusong:what_a_surprising_face` in SingleTrack Mode with looping enabled at pitches 1.0 and 0.92.
+- Published [1.4.5-beta1](https://modrinth.com/mod/new-custom-music-client-side-player/version/j3EgVfhv) on Modrinth as a Fabric beta for Minecraft 26.2 on November 19, 2026 (UTC+8).
+
+### Minecraft version branches and backports
+
+- On September 23, 2026, we preserved the final Minecraft 26.2 source on the local `26.2` branch before moving development to Minecraft 26.3. On September 24, we documented this approach for future migrations.
+- On November 14, 2026, we adopted a branch for each Minecraft version as its main development cycle ends. `main` tracks the latest Minecraft version from Mojang. We maintain older versions on `mc-<version>` branches for backports and fixes. We created `mc-26.1.2` and `mc-26.2` that day.
+- On November 19, 2026, we completed the backport of the mod’s 1.5.2 feature set from Minecraft 26.3 to Minecraft 26.2 as `1.4.5-beta1`.

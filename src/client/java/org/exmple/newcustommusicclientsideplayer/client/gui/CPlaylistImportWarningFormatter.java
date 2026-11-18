@@ -3,6 +3,8 @@ package org.exmple.newcustommusicclientsideplayer.client.gui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -33,12 +35,31 @@ public final class CPlaylistImportWarningFormatter {
         List<Component> items = new ArrayList<>();
 
         addSkippedPlaylists(items, preview);
-        addUnreadableTrackLists(items, preview);
-        addInvalidTracks(items, preview);
-        addInvalidModifiedAt(items, preview);
-        addRenamedPlaylists(items, preview);
+        addSource(items, preview, CTrackSourceType.OGG_RESOURCE);
+        addSource(items, preview, CTrackSourceType.SOUND_EVENT);
 
         return items;
+    }
+
+    private static final String SOURCE_KEY = "screen.custommusicclientsideplayer.playlist_transfer.warning.source_type";
+
+    public static boolean isSourceHeading(Component item) {
+        return item.getContents() instanceof TranslatableContents contents && SOURCE_KEY.equals(contents.getKey());
+    }
+
+    private static void addSource(List<Component> items, CPlaylistImportPreview preview, CTrackSourceType type) {
+        CPlaylistImportPreview group = preview.sourceGroup(type);
+        if (group == null) return;
+        if (!group.hasWarnings()) return;
+        if (!items.isEmpty()) items.add(Component.empty());
+        boolean ogg = type == CTrackSourceType.OGG_RESOURCE;
+        Component label = Component.translatable("screen.custommusicclientsideplayer.mod_config.track_source."
+            + (ogg ? "ogg_files" : "sound_events")).withStyle(ogg ? ChatFormatting.GOLD : ChatFormatting.GREEN);
+        items.add(Component.translatable(SOURCE_KEY, label).withStyle(ChatFormatting.GRAY));
+        addUnreadableTrackLists(items, group);
+        addInvalidTracks(items, group);
+        addInvalidModifiedAt(items, group);
+        addRenamedPlaylists(items, group);
     }
 
     private static void addSkippedPlaylists(List<Component> items, CPlaylistImportPreview preview) {

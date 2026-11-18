@@ -8,14 +8,14 @@ import java.util.Objects;
 import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
 
 public final class CPlaylistTransferData {
-    public static final int CURRENT_FORMAT_VERSION = 1;
+    public static final int CURRENT_FORMAT_VERSION = CPlaylistFormat.CURRENT_VERSION;
 
     private int formatVersion = CURRENT_FORMAT_VERSION;
     private String modId = NewcustommusicclientsideplayerClient.MOD_ID;
     private String modVersion = "";
     private String minecraftVersion = "";
     private long exportedAt;
-    private LinkedHashMap<String, Playlist> playlists = new LinkedHashMap<>();
+    private LinkedHashMap<String, Map<String, Playlist>> playlists = new LinkedHashMap<>();
 
     CPlaylistTransferData() {
     }
@@ -24,7 +24,7 @@ public final class CPlaylistTransferData {
         String modVersion,
         String minecraftVersion,
         long exportedAt,
-        Map<String, Playlist> playlists
+        Map<String, Map<String, Playlist>> playlists
     ) {
         this.modVersion = Objects.requireNonNull(modVersion, "modVersion");
         this.minecraftVersion = Objects.requireNonNull(minecraftVersion, "minecraftVersion");
@@ -52,20 +52,26 @@ public final class CPlaylistTransferData {
         return this.exportedAt;
     }
 
-    public Map<String, Playlist> playlists() {
+    public Map<String, Map<String, Playlist>> playlists() {
         return new LinkedHashMap<>(this.playlists);
     }
 
     public static final class Playlist {
+        private CTrackSourceType sourceType;
         private List<String> tracks = new ArrayList<>();
         private long modifiedAt;
 
         Playlist() {
         }
 
-        public Playlist(List<String> tracks, long modifiedAt) {
+        public Playlist(CTrackSourceType sourceType, List<String> tracks, long modifiedAt) {
+            this.sourceType = Objects.requireNonNull(sourceType, "sourceType");
             this.tracks = new ArrayList<>(Objects.requireNonNull(tracks, "tracks"));
             this.modifiedAt = modifiedAt;
+        }
+
+        public CTrackSourceType sourceType() {
+            return this.sourceType;
         }
 
         public List<String> tracks() {

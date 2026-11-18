@@ -216,7 +216,7 @@ public class CImportMessageScreen extends Screen {
             message.append("\n").append(this.listTitle);
         }
         for (Component item : this.listItems) {
-            message.append("\n").append(Component.literal("- ")).append(item);
+            message.append("\n").append(this.formatListItem(item));
         }
 
         return message;
@@ -249,9 +249,13 @@ public class CImportMessageScreen extends Screen {
             lines.add(this.listTitle);
         }
         for (Component item : this.listItems) {
-            lines.add(Component.empty().append(Component.literal("- ")).append(item));
+            lines.add(this.formatListItem(item));
         }
         return lines;
+    }
+
+    protected Component formatListItem(Component item) {
+        return Component.empty().append("- ").append(item);
     }
 
     private int messageTextWidth() {

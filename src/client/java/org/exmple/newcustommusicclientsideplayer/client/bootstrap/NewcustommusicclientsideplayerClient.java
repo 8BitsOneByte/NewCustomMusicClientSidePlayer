@@ -3,9 +3,9 @@ package org.exmple.newcustommusicclientsideplayer.client.bootstrap;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.Objects;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
@@ -15,9 +15,12 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
-import org.lwjgl.glfw.GLFW;
+import org.exmple.newcustommusicclientsideplayer.client.audio.catalog.CAudioCatalog;
+import org.exmple.newcustommusicclientsideplayer.client.audio.catalog.CAudioCatalogReloadListener;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfig;
 import org.exmple.newcustommusicclientsideplayer.client.config.CModConfigRepository;
+import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingToastMode;
+import org.exmple.newcustommusicclientsideplayer.client.customnowplayingtoast.CCustomNowPlayingToast;
 import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPauseCommand;
 import org.exmple.newcustommusicclientsideplayer.client.command.CPlaySoundCommand;
@@ -43,32 +46,32 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
     );
     private static final KeyMapping OPEN_PLAYLIST_CONFIG_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.open_playlist_config",
-            GLFW.GLFW_KEY_Z,
+            InputConstants.KEY_Z,
             CUSTOM_KEY_CATEGORY
     );
     private static final KeyMapping VOLUME_UP_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.volume_up",
-            GLFW.GLFW_KEY_UP,
+            InputConstants.KEY_UP,
             CUSTOM_KEY_CATEGORY
     );
     private static final KeyMapping VOLUME_DOWN_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.volume_down",
-            GLFW.GLFW_KEY_DOWN,
+            InputConstants.KEY_DOWN,
             CUSTOM_KEY_CATEGORY
     );
     private static final KeyMapping PREVIOUS_TRACK_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.previous_track",
-            GLFW.GLFW_KEY_LEFT,
+            InputConstants.KEY_LEFT,
             CUSTOM_KEY_CATEGORY
     );
     private static final KeyMapping NEXT_TRACK_KEY = new KeyMapping(
             "key.custommusicclientsideplayer.next_track",
-            GLFW.GLFW_KEY_RIGHT,
+            InputConstants.KEY_RIGHT,
             CUSTOM_KEY_CATEGORY
     );
     private static final KeyMapping TOGGLE_PAUSE_KEY = new KeyMapping(
             "key.newcustommusicclientsideplayer.toggle_pause",
-            GLFW.GLFW_KEY_Y,
+            InputConstants.KEY_Y,
             CUSTOM_KEY_CATEGORY
     );
 
@@ -91,6 +94,7 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
         CSkipCommand.register();
         CSkipRandomCommand.register();
         CPlaylistCommand.register();
+        org.exmple.newcustommusicclientsideplayer.client.command.CTrackSourceCommand.register();
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             CPlaySoundController.tick(client);
@@ -137,8 +141,8 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
             while (NEXT_TRACK_KEY.consumeClick()) {
             }
         });
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> CPlaySoundController.stop());
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            CAudioCatalog.getInstance().close();
             CFileDialogUtil.shutdown();
             CPlaySoundController.onClientStopping(client);
             if (modConfigSavePending) {
@@ -160,6 +164,11 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
                 }
         );
 
+        ResourceLoader.get(PackType.CLIENT_RESOURCES).registerReloadListener(
+                Identifier.fromNamespaceAndPath(MOD_ID, "audio_catalog"),
+                new CAudioCatalogReloadListener(CAudioCatalog.getInstance())
+        );
+
         CUpdateChecker.initialize(modConfig.checkForUpdates());
     }
 
@@ -170,6 +179,9 @@ public class NewcustommusicclientsideplayerClient implements ClientModInitialize
     public static void applyModConfig(CModConfig config) {
         modConfig = Objects.requireNonNull(config, "config");
         modConfigSavePending = false;
+        if (modConfig.nowPlayingToastMode() == CNowPlayingToastMode.OFF) {
+            CCustomNowPlayingToast.dismiss(Minecraft.getInstance());
+        }
         CPlaySoundController.setPlaybackVolumePercent(modConfig.playbackVolumePercent());
         CUpdateChecker.applyCheckForUpdates(modConfig.checkForUpdates());
     }

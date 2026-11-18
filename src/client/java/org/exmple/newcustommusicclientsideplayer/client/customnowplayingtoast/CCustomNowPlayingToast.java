@@ -11,6 +11,11 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.client.gui.screens.PauseScreen;
+import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+import org.exmple.newcustommusicclientsideplayer.client.config.CNowPlayingToastMode;
+import org.exmple.newcustommusicclientsideplayer.client.playback.CManagedSoundInstance;
+import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundController;
 
 public final class CCustomNowPlayingToast implements Toast {
     private static final Object TOKEN = new Object();
@@ -32,28 +37,39 @@ public final class CCustomNowPlayingToast implements Toast {
     private static int musicNoteColor = -1;
 
     private Component title;
+    private CManagedSoundInstance sound;
     private long lastChanged;
     private boolean changed = true;
     private boolean forceHide;
     private Toast.Visibility wantedVisibility = Toast.Visibility.HIDE;
 
-    private CCustomNowPlayingToast(Component title) {
+    private CCustomNowPlayingToast(Component title, CManagedSoundInstance sound) {
         this.title = title;
+        this.sound = sound;
     }
 
-    public static void show(Minecraft client, Component title) {
+    public static void show(Minecraft client, Component title, CManagedSoundInstance sound) {
         ToastManager toastManager = client.gui.toastManager();
         CCustomNowPlayingToast toast = toastManager.getToast(CCustomNowPlayingToast.class, TOKEN);
         if (toast == null) {
-            toastManager.addToast(new CCustomNowPlayingToast(title));
+            toastManager.addToast(new CCustomNowPlayingToast(title, sound));
             return;
         }
 
-        toast.updateTitle(title);
+        toast.updateTitle(title, sound);
     }
 
-    private void updateTitle(Component title) {
+    public static void dismiss(Minecraft client) {
+        CCustomNowPlayingToast toast = client.gui.toastManager().getToast(CCustomNowPlayingToast.class, TOKEN);
+        if (toast != null) {
+            toast.forceHide = true;
+            toast.wantedVisibility = Toast.Visibility.HIDE;
+        }
+    }
+
+    private void updateTitle(Component title, CManagedSoundInstance sound) {
         this.title = title;
+        this.sound = sound;
         this.changed = true;
         this.forceHide = false;
     }
@@ -70,6 +86,9 @@ public final class CCustomNowPlayingToast implements Toast {
             changed = false;
         }
 
+        if (!canShow()) {
+            forceHide = true;
+        }
         double visibleDuration = VISIBILITY_DURATION_MS * toastManager.getNotificationDisplayTimeMultiplier();
         wantedVisibility = !forceHide && time - lastChanged < visibleDuration
             ? Toast.Visibility.SHOW
@@ -79,10 +98,41 @@ public final class CCustomNowPlayingToast implements Toast {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, Font font, long time) {
-        int width = getWidth(font);
-        graphics.blitSprite(GUI_TEXTURED, NOW_PLAYING_BACKGROUND_SPRITE, 0, 0, width, HEIGHT);
-        graphics.blitSprite(GUI_TEXTURED, MUSIC_NOTES_SPRITE, 7, 7, MUSIC_NOTES_SIZE, MUSIC_NOTES_SIZE, musicNoteColor);
-        graphics.text(font, fitToWidth(font, title.getString(), width - TEXT_X - RIGHT_PADDING), TEXT_X, 11, TEXT_COLOR);
+        if (!canShow() || forceHide) {
+            return;
+        }
+        if (NewcustommusicclientsideplayerClient.getModConfig().nowPlayingToastMode() == CNowPlayingToastMode.ON_PLUS
+            && Minecraft.getInstance().gui.screen() instanceof PauseScreen pause && pause.showsPauseMenu()) {
+            return;
+        }
+        extractCard(graphics, font, title, 0, 0);
+    }
+
+    private boolean canShow() {
+        return NewcustommusicclientsideplayerClient.getModConfig().nowPlayingToastMode() != CNowPlayingToastMode.OFF
+            && sound != null && sound == CPlaySoundController.currentSoundForMusicHints();
+    }
+
+    private static void extractCard(GuiGraphicsExtractor graphics, Font font, Component title, int x, int y) {
+        tickMusicNotes();
+        int width = getWidth(font, title);
+        graphics.blitSprite(GUI_TEXTURED, NOW_PLAYING_BACKGROUND_SPRITE, x, y, width, HEIGHT);
+        graphics.blitSprite(GUI_TEXTURED, MUSIC_NOTES_SPRITE, x + 7, y + 7,
+            MUSIC_NOTES_SIZE, MUSIC_NOTES_SIZE, musicNoteColor);
+        graphics.text(font, fitToWidth(font, title.getString(), width - TEXT_X - RIGHT_PADDING),
+            x + TEXT_X, y + 11, TEXT_COLOR);
+    }
+
+    public static final class PauseDisplay {
+        public void extract(GuiGraphicsExtractor graphics, Font font, int screenWidth) {
+            CManagedSoundInstance current = CPlaySoundController.currentSoundForMusicHints();
+            if (NewcustommusicclientsideplayerClient.getModConfig().nowPlayingToastMode() != CNowPlayingToastMode.ON_PLUS
+                || current == null) {
+                return;
+            }
+            Component title = CPlaySoundController.currentMusicHintTitle(current);
+            extractCard(graphics, font, title, screenWidth - getWidth(font, title), 0);
+        }
     }
 
     @Override
@@ -92,7 +142,7 @@ public final class CCustomNowPlayingToast implements Toast {
 
     @Override
     public int width() {
-        return getWidth(Minecraft.getInstance().font);
+        return getWidth(Minecraft.getInstance().font, title);
     }
 
     @Override
@@ -111,7 +161,7 @@ public final class CCustomNowPlayingToast implements Toast {
         musicNoteColor = ColorLerper.getLerpedColor(ColorLerper.Type.MUSIC_NOTE, musicNoteColorTick);
     }
 
-    private int getWidth(Font font) {
+    private static int getWidth(Font font, Component title) {
         return Math.min(MAX_WIDTH, TEXT_X + font.width(title) + RIGHT_PADDING);
     }
 

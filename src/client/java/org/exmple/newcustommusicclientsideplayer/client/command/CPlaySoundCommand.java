@@ -16,6 +16,9 @@ import org.exmple.newcustommusicclientsideplayer.client.playback.CPlaySoundContr
 import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackNameRepository;
 
 import java.util.ArrayList;
+import org.exmple.newcustommusicclientsideplayer.client.bootstrap.NewcustommusicclientsideplayerClient;
+import org.exmple.newcustommusicclientsideplayer.client.storage.CTrackSourceType;
+import org.exmple.newcustommusicclientsideplayer.client.audio.catalog.CAudioCatalog;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -102,7 +105,7 @@ public final class CPlaySoundCommand {
         }
 
         Identifier parsedId = Identifier.tryParse(token);
-        if (parsedId != null) {
+        if (parsedId != null && CPlaySoundController.isTrackPlayable(Minecraft.getInstance(), parsedId, sourceType())) {
             return parsedId;
         }
 
@@ -113,9 +116,7 @@ public final class CPlaySoundCommand {
 
         String namespace = token.substring(0, colon);
         String localToken = token.substring(colon + 1);
-        Minecraft client = Minecraft.getInstance();
-        List<Identifier> namespaceSounds = client.getSoundManager()
-                .getAvailableSounds()
+        List<Identifier> namespaceSounds = availableTracks()
                 .stream()
                 .filter(id -> id.getNamespace().equals(namespace))
                 .toList();
@@ -128,18 +129,27 @@ public final class CPlaySoundCommand {
         }
 
         for (Identifier id : namespaceSounds) {
-            if (CTrackNameRepository.getDisplayName(id).equals(localToken)) {
+            if (CTrackNameRepository.getDisplayName(sourceType(), id).equals(localToken)) {
                 matches.add(id);
             }
         }
 
         for (Identifier id : namespaceSounds) {
-            if (CTrackNameRepository.getDefaultDisplayName(id).equals(localToken)) {
+            if (CTrackNameRepository.getDefaultDisplayName(sourceType(), id).equals(localToken)) {
                 matches.add(id);
             }
         }
 
         return matches.size() == 1 ? matches.iterator().next() : null;
+    }
+
+    private static CTrackSourceType sourceType() {
+        return NewcustommusicclientsideplayerClient.getModConfig().defaultTrackSource();
+    }
+
+    private static java.util.Collection<Identifier> availableTracks() {
+        return sourceType() == CTrackSourceType.OGG_RESOURCE ? CAudioCatalog.getInstance().resources()
+            : Minecraft.getInstance().getSoundManager().getAvailableSounds();
     }
 
     private static String stripBalancedQuotes(String token) {
@@ -162,13 +172,13 @@ public final class CPlaySoundCommand {
         String localPrefix = extractLocalPrefix(normalizedPrefix);
 
         List<SuggestionEntry> suggestions = new ArrayList<>();
-        for (Identifier id : context.getSource().getClient().getSoundManager().getAvailableSounds()) {
+        for (Identifier id : availableTracks()) {
             String rawId = id.toString();
-            String customName = CTrackNameRepository.getCustomName(id);
+            String customName = CTrackNameRepository.getCustomName(sourceType(), id);
             if (customName == null || customName.isBlank()) {
                 suggestions.add(new SuggestionEntry(forceDoubleQuoted(rawId), rawId, id.getPath()));
             } else {
-                String displayName = CTrackNameRepository.getDisplayName(id);
+                String displayName = CTrackNameRepository.getDisplayName(sourceType(), id);
                 String aliasToken = id.getNamespace() + ":" + displayName;
                 suggestions.add(new SuggestionEntry(forceDoubleQuoted(aliasToken), aliasToken, displayName));
             }
